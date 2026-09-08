@@ -1,0 +1,7 @@
+[project]
+name = "tutorlm-handwriting"
+version = "0.1.0"
+description = "Vector/ink handwriting recognition (text + math) from pen input, not image OCR"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
