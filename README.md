@@ -24,6 +24,12 @@ Two genuinely different sub-problems — see each folder's README:
 2. `uv sync`
 3. `uv run main.py`
 
+## Getting real ink data
+
+[`harness/`](harness/) is a small standalone app (Excalidraw) for drawing with a stylus and
+exporting real stroke data — see its README. Use it to generate test data for
+`recognition_text/` and `recognition_math/` rather than guessing at the input shape.
+
 ## Heads up
 
 The actual recognition SDKs worth evaluating (Google's Digital Ink Recognition, Microsoft's Ink
