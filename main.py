@@ -1,5 +1,5 @@
 def main():
-    print("Hello from tutorlm-handwriting!")
+    print("Hello from OpenRecog-Handwriting!")
 
 
 if __name__ == "__main__":

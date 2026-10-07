@@ -1,4 +1,4 @@
-# tutorlm-handwriting
+# OpenRecog-Handwriting
 
 ## What this is
 

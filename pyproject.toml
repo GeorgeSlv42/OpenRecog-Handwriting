@@ -1,5 +1,5 @@
 [project]
-name = "tutorlm-handwriting"
+name = "OpenRecog-Handwriting"
 version = "0.1.0"
 description = "Vector/ink handwriting recognition (text + math) from pen input, not image OCR"
 readme = "README.md"

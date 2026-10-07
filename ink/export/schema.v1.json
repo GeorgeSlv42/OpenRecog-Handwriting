@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:tutorlm-handwriting:schema:ink-note:1.0.0",
+  "$id": "urn:OpenRecog-Handwriting:schema:ink-note:1.0.0",
   "title": "Ink note document",
   "type": "object",
   "additionalProperties": false,
