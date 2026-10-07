@@ -15,11 +15,10 @@ Ordinary handwritten notes (prose) written with a stylus, as pen-stroke vector d
 ## What to measure
 
 - Recognition accuracy (character/word error rate) against real stylus samples.
-- On-device model size/load time if using Google's kit (models download per-language, similar
-  idea to other local models in this org's stack — don't bundle them, fetch on first use).
+- On-device model size/load time if using Google's kit (models download per-language — don't
+  bundle them, fetch on first use).
 
-## Don't confuse this with the OCR spike already in the app
+## Don't confuse this with image OCR
 
-SFTS already has a measured, working pipeline for **image-based** OCR of scanned pages
-(`ocr-htr-feasibility.md` in the SFTS codex). That's pixels in, this is pen strokes in. Different
-input, different (easier) problem — no need to reconcile the two or reuse that pipeline.
+**Image-based** OCR of scanned pages is pixels in; this is pen strokes in. Different input,
+different (easier) problem — don't try to reuse an image OCR pipeline here.

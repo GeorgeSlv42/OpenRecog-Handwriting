@@ -3,10 +3,13 @@
   flex-direction: column;
   height: 100vh;
   width: 100vw;
+  /* A scrolling page shifts the canvas under the pen mid-stroke. */
+  overflow: hidden;
 }
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -25,6 +28,24 @@
   cursor: pointer;
 }
 
+.toolbar.meta {
+  gap: 12px;
+  padding-top: 4px;
+  font-size: 12px;
+  color: #555;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar .field input {
+  width: 120px;
+  padding: 3px 6px;
+}
+
 .status {
   font-size: 13px;
   color: #555;
@@ -32,5 +53,6 @@
 
 .canvas-wrap {
   flex: 1;
+  min-height: 0;
   position: relative;
 }

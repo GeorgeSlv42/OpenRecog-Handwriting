@@ -28,6 +28,5 @@ handwriting."
 
 ## If it ever became a real feature
 
-SFTS has an existing animation engine for programmatically drawing/animating explanations on a
-canvas. A working version of this would plug in there eventually — not relevant now, just worth
-knowing it wouldn't start from zero if it ever got that far.
+Generated strokes could drive a canvas animation that draws explanations stroke by stroke. Not
+relevant now — just the natural place it would plug in if it ever got that far.

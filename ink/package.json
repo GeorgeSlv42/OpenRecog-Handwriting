@@ -1,0 +1,13 @@
+{
+  "name": "@tutorlm/ink",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "typecheck": "node ../harness/node_modules/typescript/bin/tsc -p ."
+  }
+}

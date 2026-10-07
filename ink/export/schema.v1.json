@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tutorlm-handwriting:schema:ink-note:1.0.0",
+  "title": "Ink note document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "metadata", "strokes", "structure", "recognition", "gestures", "groundTruth"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "strokes": { "type": "array", "items": { "$ref": "#/$defs/stroke" } },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocks"],
+      "properties": {
+        "blocks": { "type": "array", "items": { "$ref": "#/$defs/block" } }
+      }
+    },
+    "recognition": { "$ref": "#/$defs/recognition" },
+    "gestures": { "type": "array", "items": { "$ref": "#/$defs/gesture" } },
+    "groundTruth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label"],
+      "properties": {
+        "label": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1 },
+    "isoTime": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T" },
+    "idList": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+    "bbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "w", "h"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "w": { "type": "number", "minimum": 0 },
+        "h": { "type": "number", "minimum": 0 }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "courseId", "lectureId", "noteId", "pageId",
+        "createdAt", "updatedAt", "exportedAt",
+        "language", "source", "canvas"
+      ],
+      "properties": {
+        "courseId": { "$ref": "#/$defs/id" },
+        "lectureId": { "$ref": "#/$defs/id" },
+        "noteId": { "$ref": "#/$defs/id" },
+        "pageId": { "$ref": "#/$defs/id" },
+        "createdAt": { "$ref": "#/$defs/isoTime" },
+        "updatedAt": { "$ref": "#/$defs/isoTime" },
+        "exportedAt": { "$ref": "#/$defs/isoTime" },
+        "language": { "type": "string", "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]+)*$" },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["app", "platform", "inputDevice"],
+          "properties": {
+            "app": { "type": "string", "minLength": 1 },
+            "platform": { "enum": ["web", "android", "ios"] },
+            "inputDevice": { "enum": ["pen", "touch", "mouse", "unknown"] }
+          }
+        },
+        "canvas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height", "units"],
+          "properties": {
+            "width": { "type": "number", "minimum": 0 },
+            "height": { "type": "number", "minimum": 0 },
+            "units": { "const": "px" }
+          }
+        }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "t"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "t": { "type": "number", "minimum": 0 },
+        "p": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "stroke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strokeId", "points", "bbox"],
+      "properties": {
+        "strokeId": { "$ref": "#/$defs/id" },
+        "points": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/point" } },
+        "style": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "strokeWidth": { "type": "number", "minimum": 0 },
+            "color": { "type": "string" }
+          }
+        },
+        "bbox": { "$ref": "#/$defs/bbox" }
+      }
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineId", "strokeIds", "bbox", "recognitionId"],
+      "properties": {
+        "lineId": { "$ref": "#/$defs/id" },
+        "strokeIds": { "$ref": "#/$defs/idList" },
+        "bbox": { "$ref": "#/$defs/bbox" },
+        "recognitionId": { "type": ["string", "null"] }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockId", "type", "bbox", "lines"],
+      "properties": {
+        "blockId": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["text", "drawing", "unknown"] },
+        "bbox": { "$ref": "#/$defs/bbox" },
+        "lines": { "type": "array", "items": { "$ref": "#/$defs/line" } }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rank", "text", "score"],
+      "properties": {
+        "rank": { "type": "integer", "minimum": 1 },
+        "text": { "type": "string" },
+        "score": { "type": ["number", "null"] }
+      }
+    },
+    "recognitionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recognitionId", "target", "best", "candidates"],
+      "properties": {
+        "recognitionId": { "$ref": "#/$defs/id" },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lineId": { "$ref": "#/$defs/id" },
+            "gestureId": { "$ref": "#/$defs/id" }
+          }
+        },
+        "best": { "type": ["string", "null"] },
+        "candidates": { "type": "array", "items": { "$ref": "#/$defs/candidate" } }
+      }
+    },
+    "recognition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "engine", "error", "results"],
+      "properties": {
+        "status": { "enum": ["recognized", "notRecognized", "failed"] },
+        "engine": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["name", "modelId", "gestureModelId", "version"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "modelId": { "type": "string", "minLength": 1 },
+            "gestureModelId": { "type": ["string", "null"] },
+            "version": { "type": ["string", "null"] }
+          }
+        },
+        "error": { "type": ["string", "null"] },
+        "results": { "type": "array", "items": { "$ref": "#/$defs/recognitionResult" } }
+      }
+    },
+    "gesture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gestureId", "type", "strokeIds", "score", "targetStrokeIds", "effect", "targetRecognitionId"],
+      "properties": {
+        "gestureId": { "$ref": "#/$defs/id" },
+        "type": { "type": "string", "minLength": 1 },
+        "strokeIds": { "$ref": "#/$defs/idList" },
+        "score": { "type": ["number", "null"] },
+        "targetStrokeIds": { "$ref": "#/$defs/idList" },
+        "effect": { "enum": ["delete", "emphasize", "none"] },
+        "targetRecognitionId": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
