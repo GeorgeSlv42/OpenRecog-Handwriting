@@ -33,8 +33,19 @@ exporting real stroke data — see its README. Use it to generate test data for
 ## Ink JSON for the tutor
 
 [`ink/`](ink/) is the shared TypeScript core (strokes → layout → recognition → versioned JSON),
-used by the harness and the mobile app. The format is documented in
+used by the harness, the mobile app and the desktop app. The format is documented in
 [`docs/ink-schema.md`](docs/ink-schema.md), with samples in [`docs/samples/`](docs/samples/).
+
+## Apps and recognition engines
+
+| App | Platforms | Engine | Native code |
+|---|---|---|---|
+| [`mobile/`](mobile/) (Expo) | Android, iOS | Google ML Kit Digital Ink, on-device | Kotlin + Swift |
+| [`desktop/`](desktop/) (Tauri) | Windows 10/11 | Windows Ink handwriting recognizer, built into the OS | Rust |
+| [`harness/`](harness/) (web) | Any browser | None — capture and export only | — |
+
+Each engine sits behind the same native contract ([`docs/recognizer-contract.md`](docs/recognizer-contract.md))
+and the same `InkRecognizer` interface in `ink/`, so every app produces the same JSON.
 
 ## Where to start (Phase 1 team)
 
@@ -42,9 +53,10 @@ Each folder below has a `TODO.md` with the tasks and a "done when".
 
 | Who | Start here |
 |---|---|
-| Lead | [`mobile/modules/mlkit-ink/README.md`](mobile/modules/mlkit-ink/README.md) — sign off the native API contract first |
+| Lead | [`docs/recognizer-contract.md`](docs/recognizer-contract.md) — sign off the native API contract first; then [`ink/TODO.md`](ink/TODO.md) |
 | Dev A — Android + app | [`mobile/README.md`](mobile/README.md), then `mobile/modules/mlkit-ink/android/`, `mobile/modules/mlkit-ink/src/`, `mobile/app/` |
 | Dev B — iOS + capture | `mobile/modules/mlkit-ink/ios/`, `mobile/components/` (needs a Mac) |
+| Dev ? — Windows desktop | [`desktop/README.md`](desktop/README.md) — start with the spike in `desktop/src-tauri/TODO.md` |
 | Dev C — math + evaluation | [`recognition_math/TODO.md`](recognition_math/TODO.md), `recognition_text/dataset/`, `recognition_text/evaluation/` |
 
 ## Heads up

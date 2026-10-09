@@ -2,8 +2,17 @@
 
 **Owner:** Dev B. **Requires a Mac with Xcode.**
 
-Implements the contract in [`../README.md`](../README.md) — same names, shapes and error codes as
+Implements the contract in [`docs/recognizer-contract.md`](../../../../docs/recognizer-contract.md) — same names, shapes and error codes as
 Android. When in doubt, match what Dev A's Android module does and raise the mismatch with the lead.
+
+## Before you start
+
+- Blocked on: lead sign-off of the contract, lead approval of the CocoaPod, and the Expo scaffold
+  ([`mobile/README.md`](../../../README.md))
+- Needs a Mac with Xcode + CocoaPods, and an Apple ID in Xcode for on-device builds — see
+  Prerequisites in [`mobile/README.md`](../../../README.md)
+- First milestone: one hard-coded stroke list recognized end to end (JS → Swift → ML Kit → JS)
+  before building the full contract
 
 ## Setup
 

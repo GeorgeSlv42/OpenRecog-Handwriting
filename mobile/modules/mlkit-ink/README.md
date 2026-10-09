@@ -6,27 +6,11 @@ android/    Kotlin implementation                                    (Dev A)
 ios/        Swift implementation                                     (Dev B)
 ```
 
-## Native API contract — LEAD: finalize before any native code is written
+## Native API contract
 
-Android and iOS must expose **exactly** this to JavaScript: same function names, same argument and
-return shapes, same error codes. The TypeScript wrapper in `src/` adapts it to the `InkRecognizer`
-interface in [`ink/recognition/InkRecognizer.ts`](../../../ink/recognition/InkRecognizer.ts).
-
-Proposed (TODO lead: confirm names, then remove "proposed"):
-
-| Function | In | Out |
-|---|---|---|
-| `isModelDownloaded` | `modelId: string` | `boolean` |
-| `downloadModel` | `modelId: string`, `wifiOnly: boolean` | resolves when downloaded |
-| `deleteModel` | `modelId: string` | resolves when deleted |
-| `recognize` | `modelId`, `strokes: {x,y,t}[][]`, `preContext?: string`, `writingArea?: {width,height}` | `{ text: string, score: number \| null }[]` best-first |
-
-Error codes (reject with these, both platforms):
-
-- [ ] `MODEL_NOT_DOWNLOADED`
-- [ ] `INVALID_MODEL_ID` (language tag ML Kit doesn't know)
-- [ ] `DOWNLOAD_FAILED`
-- [ ] `RECOGNITION_FAILED`
+Shared with the Windows desktop backend: [`docs/recognizer-contract.md`](../../../docs/recognizer-contract.md).
+Android and iOS must expose exactly that to JavaScript; the TypeScript wrapper in `src/` adapts it to
+the `InkRecognizer` interface in [`ink/recognition/InkRecognizer.ts`](../../../ink/recognition/InkRecognizer.ts).
 
 ## Open questions — answer from the ML Kit docs, not from memory
 

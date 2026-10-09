@@ -2,7 +2,15 @@
 
 **Owner:** Dev A
 
-Implements the contract in [`../README.md`](../README.md). Nothing more.
+Implements the contract in [`docs/recognizer-contract.md`](../../../../docs/recognizer-contract.md).
+Nothing more.
+
+## Before you start
+
+- Blocked on: lead sign-off of the contract, and the Expo scaffold ([`mobile/README.md`](../../../README.md))
+- Works on Windows, macOS or Linux — see Prerequisites in [`mobile/README.md`](../../../README.md)
+- First milestone: one hard-coded stroke list recognized end to end (JS → Kotlin → ML Kit → JS)
+  before building the full contract
 
 ## Setup
 
