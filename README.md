@@ -36,6 +36,13 @@ exporting real stroke data — see its README. Use it to generate test data for
 used by the harness and the mobile app. The format is documented in
 [`docs/ink-schema.md`](docs/ink-schema.md), with samples in [`docs/samples/`](docs/samples/).
 
+## Windows desktop recognition
+
+[`desktop/`](desktop/) provides a runnable Windows Ink MVP: open a v1 JSON export,
+select an installed handwriting recognizer, recognize its lines, and copy the text.
+It uses Windows PowerShell 5.1 and Node.js 24+; no .NET SDK is required.
+See [`desktop/README.md`](desktop/README.md) for the launch command and limitations.
+
 ## Where to start (Phase 1 team)
 
 Each folder below has a `TODO.md` with the tasks and a "done when".
