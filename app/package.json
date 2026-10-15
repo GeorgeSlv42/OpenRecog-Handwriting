@@ -1,0 +1,33 @@
+{
+  "name": "@openrecog-handwriting/app",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "web:desktop": "expo start --web --port 8081",
+    "export:web": "expo export --platform web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~58.0.14",
+    "@openrecog-handwriting/ink": "*",
+    "@tauri-apps/api": "^2.12.4",
+    "expo": "~58.0.11",
+    "expo-file-system": "~58.0.9",
+    "expo-sharing": "~58.0.18",
+    "expo-status-bar": "~58.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-svg": "15.16.0",
+    "react-native-web": "^0.21.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "typescript": "~6.0.3"
+  }
+}

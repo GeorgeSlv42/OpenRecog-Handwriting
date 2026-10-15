@@ -1,49 +1,48 @@
 # src-tauri/ — Rust: Windows Ink behind the shared contract
 
-**Owner:** Dev ?
+**Owner:** Dev ? (desktop)
 
-Implements [`docs/recognizer-contract.md`](../../docs/recognizer-contract.md) as Tauri commands, using
-`Windows.UI.Input.Inking` through the `windows` crate. Nothing more — no layout, gestures or JSON here.
+Your file: [`src/windows_ink.rs`](src/windows_ink.rs). It already has the four commands with the right
+signatures, registered in `lib.rs` and called from the app. `download_model` / `delete_model` are
+**done** (Windows can't install recognizers from an app, so they return `DOWNLOAD_UNSUPPORTED`).
+You implement `is_model_downloaded` and `recognize`. Contract:
+[`docs/recognizer-contract.md`](../../docs/recognizer-contract.md).
 
-The Microsoft guide is written for UWP with an on-screen `InkCanvas`. We don't use `InkCanvas`: strokes
-arrive as JSON from the frontend and are rebuilt in Rust.
-https://learn.microsoft.com/en-us/windows/uwp/ui-input/convert-ink-to-text
+The scaffold has **not been compiled yet**: the machine it was made on has no Rust toolchain. Your first
+`npm run desktop` is also the first build; fix any compile errors in the scaffold first and tell the
+lead what they were.
 
-## Spike first — do this before the Tauri scaffold
+## Already answered by `recog_mvp/` (PowerShell prototype — read `Invoke-InkLine` in `WindowsInk.ps1`)
 
-- [ ] Plain Rust binary (no Tauri) that reads `docs/samples/harness-export.v1.json`, rebuilds its strokes,
-      and prints recognition candidates
-- [ ] Answer, and record the answers in this file:
-  - [ ] Does `InkRecognizerContainer` work in an unpackaged desktop process, or does it need package
-        identity / a UI thread / COM apartment setup?
-  - [ ] Can strokes be built from our points with `InkStrokeBuilder` (`InkPoint` with position +
-        pressure, and per-point timestamps if an overload accepts them)?
-  - [ ] Are coordinates scale-sensitive? (Our points are canvas px; Windows ink uses DIPs.)
-  - [ ] How to map a BCP-47 tag (`en-US`) to an installed recognizer (`GetRecognizers()` gives
-        display names — is there a language property, or do we match names?)
-  - [ ] Is there any way to pass context text or a writing area? (Expected: no.)
+- `InkRecognizerContainer` works in an unpackaged desktop process (no UWP, no package identity)
+- Strokes: `InkStrokeBuilder.CreateStrokeFromInkPoints(points, Matrix3x2::identity())` with
+  `InkPoint::new(position, pressure)`; pressure defaults to 0.5 when absent
+- Translate each line so its min x/y is 0, keeping relative spacing between strokes
+- `RecognizeAsync(container, InkRecognitionTarget::All)` returns one result **per word**; sort by
+  `BoundingRect.X` and join each word's first candidate → the line's best text
+- Recognizer names are localized display names (`Microsoft English (US) Handwriting Recognizer`),
+  not BCP-47 tags
 
-## Work — verify every type/method name against the Windows API docs before using it
+## Work — verify every type/method name against the windows-rs docs before using it
 
-- [ ] Commands: `is_model_downloaded`, `download_model`, `delete_model`, `recognize` — names and shapes
-      exactly as the contract, converted to Tauri's snake_case/camelCase rules consistently
-- [ ] `is_model_downloaded(modelId)`: true when a recognizer for that language is installed
-- [ ] `download_model` / `delete_model`: reject `DOWNLOAD_UNSUPPORTED` (once the lead confirms it)
-- [ ] Unknown language tag → `INVALID_MODEL_ID`; known but not installed → `MODEL_NOT_DOWNLOADED`;
-      gesture model ids → `INVALID_MODEL_ID` (Windows has no gesture model)
-- [ ] `recognize`: build an `InkStrokeContainer` from the strokes, select the recognizer, run
-      `RecognizeAsync` with target `All`
-- [ ] Windows returns candidates **per word**. Combine into whole-line candidates: first candidate =
-      each word's top candidate joined with spaces; decide with the lead whether to emit alternatives
-      (and how many) — don't build a combinatorial explosion
-- [ ] `score` is always `null` (Windows gives text only)
-- [ ] Recognition failure → `RECOGNITION_FAILED`
-- [ ] Run off the main/UI thread; cache the recognizer container
+- [ ] Add the `windows` crate to `Cargo.toml` with the features for `UI_Input_Inking`,
+      `Foundation`, `Foundation_Collections`, `Foundation_Numerics` (check exact feature names)
+- [ ] Map a BCP-47 tag (`en-US`) to an installed recognizer. Recognizers have no language property in
+      the prototype, so find a reliable mapping (check the API docs first; fall back to a small lookup
+      table of display names) and document it here
+- [ ] `is_model_downloaded`: true when a recognizer for the tag is installed; unknown tag →
+      `INVALID_MODEL_ID`; gesture model ids → `INVALID_MODEL_ID` (Windows has no gesture model)
+- [ ] `recognize`: not installed → `MODEL_NOT_DOWNLOADED`; build strokes, select the recognizer
+      (`SetDefaultRecognizer`), run `RecognizeAsync`, combine per-word results into whole-line
+      candidates. First candidate = best words joined with spaces. Decide with the lead whether to
+      emit alternatives (e.g. swap one word at a time), and don't build a combinatorial explosion
+- [ ] `score` always `None` (Windows gives text only); engine failure → `RECOGNITION_FAILED`
+- [ ] Don't block the UI thread (commands are `async`; WinRT calls may need a blocking task or the
+      right COM apartment, so check what windows-rs requires)
+- [ ] Optional: report the Windows build as `engineVersion` (set it in `app/src/recognizer/windowsInk.ts`)
 
 ## Done when
 
-- [ ] Spike answers recorded above, and the Windows rows of `docs/recognizer-contract.md` corrected
-- [ ] Recognizes the replayed `docs/samples/harness-export.v1.json` strokes
-- [ ] All applicable error codes reachable and tested manually (uninstall the language pack to test
-      `MODEL_NOT_DOWNLOADED`)
-- [ ] Output shape matches the ML Kit modules for the same input
+- [ ] Same sample strokes give the same text as `recog_mvp` (`-Headless` mode) for the same recognizer
+- [ ] Uninstalling the language pack gives `MODEL_NOT_DOWNLOADED` with a readable message
+- [ ] No `NOT_IMPLEMENTED` left; output shape matches the ML Kit modules for the same input

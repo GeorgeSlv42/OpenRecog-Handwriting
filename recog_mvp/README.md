@@ -1,5 +1,10 @@
 # Windows Ink desktop MVP
 
+> **Reference, not the product.** This prototype proved Windows Ink works from a plain desktop
+> process (no UWP). The real desktop app is [`../desktop/`](../desktop/); the desktop dev ports
+> `Invoke-InkLine` below into Rust in `desktop/src-tauri/src/windows_ink.rs`. Keep this runnable
+> so recognition output can be compared while porting.
+
 Open a schema v1 ink JSON export, choose an installed Windows handwriting recognizer,
 recognize its lines, and copy the transcript. Recognition runs locally. The source file
 is never modified. This is a standalone desktop prototype, not an Electron app or the
@@ -11,10 +16,10 @@ Requirements: Windows 10/11, Windows PowerShell 5.1 (built into Windows), Node.j
 PATH, and a Windows handwriting language installed. No npm dependencies or .NET SDK
 are needed. Use `powershell.exe`, not PowerShell 7 (`pwsh`).
 
-Double-click `desktop/Start.cmd`, or run this from the repository root:
+Double-click `recog_mvp/Start.cmd`, or run this from the repository root:
 
 ```powershell
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\desktop\WindowsInk.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\recog_mvp\WindowsInk.ps1
 ```
 
 `Bypass` applies only to this process; it does not change the machine's execution policy.
@@ -31,7 +36,7 @@ options, install its **Handwriting** feature, and restart the app. Menu names va
 You can also preload a file:
 
 ```powershell
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\desktop\WindowsInk.ps1 -File .\docs\samples\harness-export.v1.json
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\recog_mvp\WindowsInk.ps1 -File .\docs\samples\harness-export.v1.json
 ```
 
 The checked-in sample is useful for testing the plumbing; its ground-truth label is not
@@ -69,14 +74,14 @@ the MVP runnable without a native build toolchain; a later desktop shell can rep
 ## Verification and headless usage
 
 ```powershell
-node --test desktop/prepare.test.ts
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\desktop\WindowsInk.ps1 -ListRecognizers
+node --test recog_mvp/prepare.test.ts
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\recog_mvp\WindowsInk.ps1 -ListRecognizers
 ```
 
 Use an exact installed recognizer name from the second command:
 
 ```powershell
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\desktop\WindowsInk.ps1 -Headless -File .\docs\samples\harness-export.v1.json -RecognizerName 'Microsoft English (US) Handwriting Recognizer'
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\recog_mvp\WindowsInk.ps1 -Headless -File .\docs\samples\harness-export.v1.json -RecognizerName 'Microsoft English (US) Handwriting Recognizer'
 ```
 
 Headless output is a diagnostic JSON report, not a schema v1 document. Errors produce a nonzero exit.

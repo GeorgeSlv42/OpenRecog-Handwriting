@@ -15,8 +15,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    // ink/ has no node_modules of its own; borrow @types/node + typescript from the harness.
-    "typeRoots": ["../harness/node_modules/@types"],
     "types": ["node"]
   },
   "include": ["**/*.ts"]

@@ -1,0 +1,22 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.mlkitink'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.mlkitink"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // ML Kit Digital Ink goes here (approved). Take the version from the ML Kit Android release notes.
+}

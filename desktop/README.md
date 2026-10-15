@@ -1,72 +1,67 @@
-# desktop — Tauri app: capture → Windows Ink recognition → JSON export
+# desktop — Windows app: Tauri shell + Windows Ink
 
-The Windows counterpart of [`../mobile/`](../mobile/). ML Kit Digital Ink has no desktop SDK, so on
-Windows recognition uses the handwriting recognizer built into the OS (`Windows.UI.Input.Inking`).
-Everything except that call is shared: the [`../ink/`](../ink/) pipeline, the JSON schema
-([`../docs/ink-schema.md`](../docs/ink-schema.md)) and the native contract
-([`../docs/recognizer-contract.md`](../docs/recognizer-contract.md)).
-
-**Windows 10/11 only.** macOS/Linux have no stroke recognizer we know of; the app may still run
-there for capture + export (`recognition.status: "notRecognized"`), but that is not a Phase 1 goal.
-
-## Layout (target)
+ML Kit has no desktop SDK, so on Windows recognition uses the handwriting recognizer built into the OS
+(`Windows.UI.Input.Inking`). The desktop app is **not a second UI**: Tauri opens a native window that
+loads the web build of [`../app/`](../app/), the same screen, canvas and pipeline as Android/iOS.
+The only desktop-specific code is the Rust side of the recognizer.
 
 ```
 desktop/
-  src/                       web frontend (Vite + React)
-    app/                     test screen; capture reused from harness/          Dev ?
-    recognizer/              TS wrapper implementing InkRecognizer               Dev ?
-  src-tauri/                 Rust: Tauri shell + Windows Ink commands            Dev ?
+  package.json                    Tauri CLI (npm run dev / build)
+  src-tauri/
+    tauri.conf.json               dev: loads Expo web on :8081 · build: ships app/dist        done
+    src/lib.rs                    registers the commands                                       done
+    src/windows_ink.rs            the 4 contract commands (stubs + DOWNLOAD_UNSUPPORTED done)  ← your work
+    capabilities/, icons/         Tauri config + generated icons                               done
 ```
 
-Each folder has a `TODO.md` with the work and a "done when". Delete a `TODO.md` once it's done.
+How a Recognize click reaches Windows: `RecognizeScreen` → `ink` pipeline → `NativeInkRecognizer` →
+`app/src/recognizer/windowsInk.ts` (`invoke('recognize', …)`) → `windows_ink::recognize` in Rust.
+Everything before the Rust function is done and tested.
 
-## Order of work
+**Windows 10/11 only.** In a plain browser (`npm run web`) the same UI runs as capture + export only.
 
-1. **Lead:** sign off [`../docs/recognizer-contract.md`](../docs/recognizer-contract.md), including the
-   proposed `DOWNLOAD_UNSUPPORTED` code and the Windows rows of the differences table.
-2. **Spike (before scaffolding the full app):** prove a Rust program can recognize the strokes in
-   [`../docs/samples/harness-export.v1.json`](../docs/samples/harness-export.v1.json) with Windows Ink,
-   outside a UWP app. See [`src-tauri/TODO.md`](src-tauri/TODO.md). If it can't, stop and tell the lead —
-   the whole desktop plan depends on this.
-3. Scaffold the Tauri app (below).
-4. In parallel: Windows Ink commands (`src-tauri/`), recognizer wrapper (`src/recognizer/`), test screen
-   (`src/app/`).
-5. Same sample ink must give the same JSON shape as mobile (texts may differ — different engine).
+## Run it
 
-## Scaffolding (once)
+1. Prerequisites below, once. Check with `npx tauri info` in `desktop/`: Environment must be all ✔.
+2. Repo root: `npm install`
+3. Repo root: `npm run desktop`. Tauri starts the Expo web server, compiles Rust (slow the first time)
+   and opens the window. Edits to `app/` hot-reload; edits to Rust recompile and restart.
 
-This folder already holds TODO files, so generate into a temp folder and move the files in:
+Until `windows_ink.rs` is filled in, the screen shows
+`windows-ink: is_model_downloaded is not implemented yet`. That's your starting line.
 
-- [ ] `npm create tauri-app@latest desktop-tmp` (React + TypeScript + Vite), move its contents into
-      `desktop/`
-- [ ] Make `../ink` importable (root npm workspaces — see [`../ink/TODO.md`](../ink/TODO.md)). Don't copy it.
-- [ ] Commit the generated scaffold on its own before adding features
-
-Check the generator flags against the current Tauri docs before running; don't guess.
+Release build: `npm run build -w @openrecog-handwriting/desktop`. It runs `expo export` and bundles
+`app/dist` into an installer under `desktop/src-tauri/target/release/bundle/`.
 
 ## Prerequisites
 
-- Windows 10/11 with a **handwriting recognition** language pack installed
-  (Settings → Time & language → Language → language options → Handwriting)
-- Rust via rustup, with the MSVC toolchain (Visual Studio Build Tools, "Desktop development with C++")
+Follow the Tauri "Prerequisites → Windows" page; it's the source of truth. In short:
+
+- Visual Studio Build Tools with **"Desktop development with C++"** (MSVC + Windows SDK)
+- Rust via rustup (`rustup default stable-msvc`)
 - WebView2 runtime (preinstalled on Windows 11)
-- Node 24+ (same as `ink/`)
+- Node 24+
+- A Windows **handwriting** language pack (Settings → Time & language → Language → language options →
+  Handwriting). Without it there's nothing to recognize with.
 
-Follow the Tauri "prerequisites" page for Windows; it is the source of truth for the exact list.
+## Reference implementation
 
-## Dependencies that need lead approval before adding
+[`../recog_mvp/`](../recog_mvp/) is a working PowerShell prototype of exactly this backend. Run it
+next to the app to compare outputs while porting. Its `Invoke-InkLine` function is the recipe for
+`recognize`.
 
-- Tauri 2 (`@tauri-apps/cli`, `@tauri-apps/api`, `tauri` crate) — **ask**
-- `windows` crate (windows-rs) with the `UI_Input_Inking` feature set — **ask**
-- React + Vite (already used by `harness/`) — approved
-- `@excalidraw/excalidraw` (already used by `harness/`) — approved
+## Dependency decisions (lead)
+
+- Tauri 2 (`@tauri-apps/cli`, `@tauri-apps/api`, `tauri` crate) — approved, already in
+- `windows` crate (windows-rs) with the inking features — approved, add it when you start the Rust work
+- Anything else: ask first.
 
 ## Done when (Phase 1)
 
-- [ ] Draw on Windows with pen or mouse, tap Recognize, get per-line text + candidates
-- [ ] Missing language pack shows a clear "install handwriting for <language> in Windows Settings" state
-- [ ] Export validates with `validateDocument()` from `ink/`
-- [ ] Works offline
-- [ ] A sample Windows export is added to `docs/samples/` (real Windows Ink output)
-- [ ] This README has real run instructions
+- [x] `npm run desktop` opens the shared app in a native window, wired to Rust commands
+- [ ] `windows_ink.rs` implemented (see [`src-tauri/TODO.md`](src-tauri/TODO.md)); no `NOT_IMPLEMENTED` left
+- [ ] Draw with pen or mouse, Recognize, get per-line text + candidates
+- [ ] Missing language pack shows the "install handwriting for … in Windows Settings" message
+- [ ] Export (download) works inside the Tauri window and validates with `validateDocument()`
+- [ ] A real Windows export is added to `docs/samples/`

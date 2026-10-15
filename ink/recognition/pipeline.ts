@@ -63,6 +63,11 @@ export function gestureCandidates(strokes: readonly Stroke[], opts: PipelineOpti
   return out
 }
 
+/** Documents are plain JSON; avoids structuredClone, which React Native's Hermes may lack. */
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value))
+}
+
 function tail(text: string, n: number): string {
   return n > 0 ? text.slice(-n) : ''
 }
@@ -81,7 +86,7 @@ export async function recognizeDocument(
 ): Promise<NoteDocument> {
   const opts: PipelineOptions = { ...DEFAULT_PIPELINE, ...options }
   const modelId = opts.modelId ?? input.metadata.language
-  const doc: NoteDocument = structuredClone(input)
+  const doc: NoteDocument = clone(input)
   doc.recognition = {
     status: 'failed',
     engine: {
@@ -166,7 +171,7 @@ export async function recognizeDocument(
     doc.recognition.error = err instanceof Error ? err.message : String(err)
     doc.recognition.results = []
     doc.gestures = []
-    doc.structure = structuredClone(input.structure)
+    doc.structure = clone(input.structure)
   }
 
   return doc

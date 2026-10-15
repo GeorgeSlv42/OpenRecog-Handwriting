@@ -42,7 +42,7 @@ Because v1 validation uses `additionalProperties: false`, a minor bump ships a n
 | `courseId`, `lectureId`, `noteId`, `pageId` | Non-empty ids from the host app. A note has pages; one document = one page. |
 | `createdAt`, `updatedAt`, `exportedAt` | ISO-8601 UTC. Created = page started, updated = last edit, exported = this file. |
 | `language` | BCP-47 tag (e.g. `en-US`). Also the default recognition model id. |
-| `source.app` | `harness`, `mobile`, … |
+| `source.app` | `harness`, `openrecog-mobile` (Android/iOS), `openrecog-desktop` (Windows, `platform: "web"`), `openrecog-web` (plain browser) |
 | `source.platform` | `web` \| `android` \| `ios` |
 | `source.inputDevice` | Dominant pointer type: `pen` \| `touch` \| `mouse` \| `unknown` |
 | `canvas` | Size of the visible writing surface at export, `units: "px"`. Stroke coordinates are canvas/scene coordinates and may fall outside this box on an infinite canvas. |
@@ -85,7 +85,7 @@ ML Kit — the engine does not segment pages. Thresholds are relative to line he
 | Field | Meaning |
 |---|---|
 | `status` | `notRecognized` (e.g. harness export; web can't run ML Kit), `recognized`, or `failed` |
-| `engine` | `{ name, modelId, gestureModelId, version }`, `null` when not recognized |
+| `engine` | `{ name, modelId, gestureModelId, version }`, `null` when not recognized. Known `name`s: `mlkit-digital-ink` (Android/iOS), `windows-ink` (desktop; `score` is always `null`, no gesture model) |
 | `error` | Message when `failed`; strokes/structure are still valid and exported |
 | `results[]` | One per recognized line, plus one per delete-gesture's target strokes |
 

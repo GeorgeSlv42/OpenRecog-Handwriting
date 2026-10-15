@@ -3,7 +3,7 @@
 **Owner:** Dev C. Read [`README.md`](README.md) first (why math ≠ text).
 
 ML Kit and Windows Ink do not handle math notation, so this track is **evaluate first, integrate
-later**. Nothing here blocks the text pipeline (`mobile/`, `desktop/`), and nothing there should wait
+later**. Nothing here blocks the text pipeline (`app/`, `desktop/`), and nothing there should wait
 on this.
 
 ## Layout
@@ -69,7 +69,7 @@ Each folder has a `TODO.md` with the work and a "done when". Delete a `TODO.md` 
 
 - [ ] Engine (MyScript vs. alternatives vs. building a layout parser) with numbers
 - [ ] License cost for our usage
-- [ ] Platforms: does the chosen engine run on Android, iOS **and Windows** (to match `mobile/` and
+- [ ] Platforms: does the chosen engine run on Android, iOS **and Windows** (to match `app/` and
       `desktop/`), on-device or cloud only?
 - [ ] How math regions are identified: student-toggled "math mode" (simple) vs. auto-detect (hard)
 - [ ] Interface: a separate `MathRecognizer` in `ink/recognition/` (proposed — output is LaTeX/MathML,
