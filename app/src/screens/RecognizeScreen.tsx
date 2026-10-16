@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import {
   buildDocument,
@@ -7,8 +7,10 @@ import {
   serializeDocument,
   type NoteDocument,
   type RawStroke,
+  type InputDevice,
 } from '@openrecog-handwriting/ink'
 import { InkCanvas } from '../components/InkCanvas'
+import type { InkCanvasSnapshot } from '../components/inkCanvasTypes'
 import { DEFAULTS } from '../config'
 import { shareDocument } from '../export/shareDocument'
 import { createRecognizer } from '../recognizer/createRecognizer'
@@ -35,6 +37,11 @@ export function RecognizeScreen() {
   const [language, setLanguage] = useState(DEFAULTS.language)
   const [strokes, setStrokes] = useState<RawStroke[]>([])
   const [canvas, setCanvas] = useState({ width: 0, height: 0 })
+  const [sessionId, setSessionId] = useState(0)
+  const canvasVersion = useRef({ sessionId: 0, revision: 0 })
+  const [inputDevice, setInputDevice] = useState<InputDevice>('unknown')
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [missingInk, setMissingInk] = useState(0)
   const [doc, setDoc] = useState<NoteDocument | null>(null)
   const [model, setModel] = useState<ModelState>(recognizer ? 'checking' : 'none')
   const [busy, setBusy] = useState(false)
@@ -71,18 +78,20 @@ export function RecognizeScreen() {
     buildDocument({
       ids: DEFAULTS.ids,
       language,
-      source: { ...setup.source, inputDevice: 'unknown' },
+      source: { ...setup.source, inputDevice },
       canvas,
       strokes,
     })
 
   const onRecognize = () =>
     run(async () => {
+      const version = canvasVersion.current
       if (!recognizer) {
         setDoc(build())
         return setup.unavailableReason
       }
       const result = await recognizeDocument(build(), recognizer, { gestureModelId: setup.gestureModelId })
+      if (version !== canvasVersion.current) return 'The drawing changed. Tap Recognize again.'
       setDoc(result)
       refreshModel()
       return result.recognition.status === 'failed' ? `Recognition failed: ${result.recognition.error}` : null
@@ -108,14 +117,27 @@ export function RecognizeScreen() {
     })
 
   const onClear = () => {
+    const nextSession = canvasVersion.current.sessionId + 1
+    canvasVersion.current = { sessionId: nextSession, revision: 0 }
+    setSessionId(nextSession)
     setStrokes([])
+    setIsDrawing(false)
+    setMissingInk(0)
+    setInputDevice('unknown')
     setDoc(null)
     setOpenLine(null)
     setMessage(null)
   }
 
-  const onStrokesChange = (next: RawStroke[]) => {
-    setStrokes(next)
+  const onCanvasChange = (snapshot: InkCanvasSnapshot) => {
+    const current = canvasVersion.current
+    if (snapshot.sessionId !== current.sessionId || snapshot.revision <= current.revision) return
+    canvasVersion.current = { sessionId: snapshot.sessionId, revision: snapshot.revision }
+    setStrokes(snapshot.strokes)
+    setCanvas({ width: snapshot.width, height: snapshot.height })
+    setInputDevice(snapshot.inputDevice)
+    setIsDrawing(snapshot.isDrawing)
+    setMissingInk(snapshot.missing)
     setDoc(null)
   }
 
@@ -132,6 +154,7 @@ export function RecognizeScreen() {
           onChangeText={setLanguage}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!busy}
         />
         <Text style={styles.label}>
           {recognizer?.engineName ?? 'capture only'} · model {MODEL_LABEL[model]}
@@ -144,16 +167,16 @@ export function RecognizeScreen() {
         ) : null}
       </View>
 
-      <InkCanvas strokes={strokes} onStrokesChange={onStrokesChange} onSizeChange={setCanvas} />
+      <InkCanvas sessionId={sessionId} disabled={busy} onChange={onCanvasChange} />
 
       <View style={styles.toolbar}>
-        <Button title={busy ? 'Working…' : 'Recognize'} onPress={onRecognize} disabled={busy || strokes.length === 0} primary />
-        <Button title="Export JSON" onPress={onExport} disabled={busy || strokes.length === 0} />
-        <Button title="Undo" onPress={() => onStrokesChange(strokes.slice(0, -1))} disabled={busy || strokes.length === 0} />
-        <Button title="Clear" onPress={onClear} disabled={busy} />
+        <Button title={busy ? 'Working…' : 'Recognize'} onPress={onRecognize} disabled={busy || isDrawing || missingInk > 0 || strokes.length === 0} primary />
+        <Button title="Export JSON" onPress={onExport} disabled={busy || isDrawing || missingInk > 0 || strokes.length === 0} />
+        <Button title="Clear" onPress={onClear} disabled={busy || isDrawing} />
         <Text style={styles.label}>{strokes.length} strokes</Text>
       </View>
 
+      {missingInk > 0 ? <Text style={styles.message}>Some ink was imported, resized, rotated, or interrupted. Undo that change or redraw it before recognizing. Use Excalidraw’s undo and eraser controls.</Text> : null}
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
       <ScrollView style={styles.results}>

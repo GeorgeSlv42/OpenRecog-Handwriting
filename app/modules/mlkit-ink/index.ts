@@ -3,7 +3,7 @@ import { Platform } from 'react-native'
 import { NativeInkRecognizer, type NativeRecognizer } from '@openrecog-handwriting/ink'
 
 /** Set to the ML Kit dependency version each platform's native code ships with. */
-const MLKIT_VERSION = Platform.select<string | null>({ android: null, ios: null, default: null })
+const MLKIT_VERSION = Platform.select<string | null>({ android: '19.0.0', ios: null, default: null })
 
 /** Null when the native module isn't linked (Expo Go, web, or a build made before the module existed). */
 export function createMlKitRecognizer(): NativeInkRecognizer | null {

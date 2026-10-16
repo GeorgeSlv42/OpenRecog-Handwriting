@@ -18,5 +18,6 @@ android {
 }
 
 dependencies {
-  // ML Kit Digital Ink goes here (approved). Take the version from the ML Kit Android release notes.
+  // Keep in sync with MLKIT_VERSION.android in ../index.ts.
+  implementation 'com.google.mlkit:digital-ink-recognition:19.0.0'
 }

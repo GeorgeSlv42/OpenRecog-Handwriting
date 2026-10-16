@@ -12,7 +12,7 @@
     "ios": "npm run ios -w @openrecog-handwriting/app",
     "web": "npm run web -w @openrecog-handwriting/app",
     "desktop": "npm run dev -w @openrecog-handwriting/desktop",
-    "test": "npm test -w @openrecog-handwriting/ink && node --test \"recog_mvp/*.test.ts\"",
+    "test": "npm test -w @openrecog-handwriting/ink && node --test \"recog_mvp/*.test.ts\" \"harness/src/capture/*.test.ts\"",
     "typecheck": "npm run typecheck -w @openrecog-handwriting/ink && npm run typecheck -w @openrecog-handwriting/app",
     "check": "npm run typecheck && npm test"
   }

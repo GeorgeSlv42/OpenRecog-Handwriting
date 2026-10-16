@@ -1,4 +1,3 @@
-import { viewportCoordsToSceneCoords } from '@excalidraw/excalidraw'
 import type { OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type { AppState } from '@excalidraw/excalidraw/types'
 import type { InputDevice, Point, RawStroke } from '../../../ink/index.ts'
@@ -12,6 +11,7 @@ import type { InputDevice, Point, RawStroke } from '../../../ink/index.ts'
 interface Recording {
   pointerType: string
   points: Point[]
+  geometry?: { width: number; height: number; angle: number; points: string }
 }
 
 type FreeDraw = Extract<OrderedExcalidrawElement, { type: 'freedraw' }>
@@ -24,30 +24,36 @@ export class TimedInkCapture {
   private pending: Recording[] = []
   private byElement = new Map<string, Recording>()
   private getAppState: () => AppState | null
+  private toScene: (event: PointerEvent, state: AppState) => { x: number; y: number }
 
-  constructor(getAppState: () => AppState | null) {
+  constructor(
+    getAppState: () => AppState | null,
+    toScene: (event: PointerEvent, state: AppState) => { x: number; y: number },
+  ) {
     this.getAppState = getAppState
+    this.toScene = toScene
   }
 
   attach(target: HTMLElement): () => void {
     const down = (e: PointerEvent) => this.onDown(e)
     const move = (e: PointerEvent) => this.onMove(e)
     const up = (e: PointerEvent) => this.onUp(e)
+    const cancel = (e: PointerEvent) => this.onCancel(e)
     // Capture phase so we see the event before Excalidraw creates the element.
     target.addEventListener('pointerdown', down, true)
     window.addEventListener('pointermove', move, true)
     window.addEventListener('pointerup', up, true)
-    window.addEventListener('pointercancel', up, true)
+    window.addEventListener('pointercancel', cancel, true)
     return () => {
       target.removeEventListener('pointerdown', down, true)
       window.removeEventListener('pointermove', move, true)
       window.removeEventListener('pointerup', up, true)
-      window.removeEventListener('pointercancel', up, true)
+      window.removeEventListener('pointercancel', cancel, true)
     }
   }
 
   private toPoint(e: PointerEvent, appState: AppState): Point {
-    const { x, y } = viewportCoordsToSceneCoords(e, appState)
+    const { x, y } = this.toScene(e, appState)
     const point: Point = { x, y, t: e.timeStamp }
     // Mice and most touchscreens report a constant placeholder, not real pressure.
     if (e.pointerType === 'pen') point.p = e.pressure
@@ -72,13 +78,33 @@ export class TimedInkCapture {
   }
 
   private onUp(e: PointerEvent): void {
+    const rec = this.active.get(e.pointerId)
+    const state = this.getAppState()
+    if (rec && state) rec.points.push(this.toPoint(e, state))
     this.active.delete(e.pointerId)
   }
+
+  private onCancel(e: PointerEvent): void {
+    const rec = this.active.get(e.pointerId)
+    this.active.delete(e.pointerId)
+    if (!rec) return
+    this.pending = this.pending.filter((item) => item !== rec)
+    for (const [id, item] of this.byElement) if (item === rec) this.byElement.delete(id)
+  }
+
+  isDrawing(): boolean { return this.active.size > 0 }
 
   /** Call from Excalidraw's onChange. Links new freedraw elements to their recordings. */
   sync(elements: readonly OrderedExcalidrawElement[]): void {
     for (const el of elements) {
-      if (el.type !== 'freedraw' || el.isDeleted || this.byElement.has(el.id)) continue
+      if (el.type !== 'freedraw' || el.isDeleted) continue
+      const linked = this.byElement.get(el.id)
+      if (linked) {
+        if (!linked.geometry && ![...this.active.values()].includes(linked)) {
+          linked.geometry = { width: el.width, height: el.height, angle: el.angle, points: JSON.stringify(el.points) }
+        }
+        continue
+      }
       const [dx, dy] = el.points[0] ?? [0, 0]
       const idx = this.pending.findIndex((rec) => {
         const p = rec.points[0]
@@ -86,6 +112,10 @@ export class TimedInkCapture {
       })
       if (idx === -1) continue
       this.byElement.set(el.id, this.pending[idx])
+      const rec = this.pending[idx]
+      if (![...this.active.values()].includes(rec)) {
+        rec.geometry = { width: el.width, height: el.height, angle: el.angle, points: JSON.stringify(el.points) }
+      }
       // Older finished recordings that never produced an element (e.g. a pan) are dead.
       this.pending = this.pending.slice(idx + 1)
     }
@@ -99,7 +129,14 @@ export class TimedInkCapture {
     for (const el of elements) {
       if (el.type !== 'freedraw' || el.isDeleted) continue
       const rec = this.byElement.get(el.id)
+      if (rec && [...this.active.values()].includes(rec)) continue
       if (!rec || rec.points.length === 0) {
+        missing++
+        continue
+      }
+      const geometry = rec.geometry
+      if (geometry && (geometry.width !== el.width || geometry.height !== el.height ||
+        geometry.angle !== el.angle || geometry.points !== JSON.stringify(el.points))) {
         missing++
         continue
       }

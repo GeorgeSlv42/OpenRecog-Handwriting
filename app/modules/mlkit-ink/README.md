@@ -3,16 +3,17 @@
 ```
 index.ts                  JS glue: createMlKitRecognizer() → NativeInkRecognizer      done
 expo-module.config.json   autolinking (module name "MlkitInk")                       done
-android/                  Kotlin: MlkitInkModule.kt (stubs) + build.gradle           Dev A
+android/                  Kotlin: ML Kit text MVP + build.gradle                    Dev A
 ios/                      Swift: MlkitInkModule.swift (stubs) + MlkitInk.podspec     Dev B
 ```
 
 ## Native API contract
 
 Shared with the Windows desktop backend: [`docs/recognizer-contract.md`](../../../docs/recognizer-contract.md).
-Both native files already declare the four functions with the right argument types and throw
-`NOT_IMPLEMENTED`. Replace the bodies; JS-side conversion, ranking and error mapping are done for you
-by `NativeInkRecognizer` in [`ink/recognition/NativeRecognizer.ts`](../../../ink/recognition/NativeRecognizer.ts).
+Android implements the four functions; see [its README](android/README.md) for setup and device
+verification. iOS still contains `NOT_IMPLEMENTED` stubs. JS-side conversion, ranking and error
+mapping are provided by `NativeInkRecognizer` in
+[`ink/recognition/NativeRecognizer.ts`](../../../ink/recognition/NativeRecognizer.ts).
 
 When you set the ML Kit dependency version, also set it in `MLKIT_VERSION` in `index.ts`. It's what
 ends up in `recognition.engine.version` in every export.

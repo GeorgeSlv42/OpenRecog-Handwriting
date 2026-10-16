@@ -20,7 +20,8 @@ app/
   app.json                        Expo config (bundle ids, plugins)
   src/
     screens/RecognizeScreen.tsx   test screen: draw → recognize → results → export      shared, done
-    components/InkCanvas.tsx      stroke capture (PanResponder + react-native-svg)     shared, done
+    components/InkCanvas.tsx      native wrapper for the Excalidraw DOM canvas        shared
+    components/ExcalidrawCanvas.tsx Excalidraw + timed pointer capture                 shared
     recognizer/
       createRecognizer.ts         Android/iOS: picks ML Kit                            done
       createRecognizer.web.ts     web: Windows Ink inside Tauri, else none             done
@@ -72,23 +73,38 @@ One-time, from the **repo root**: `npm install` (installs `ink`, `app` and `desk
   `modules/mlkit-ink/android/build.gradle`
 - `GoogleMLKit/DigitalInkRecognition` (iOS CocoaPod) — approved, add it in
   `modules/mlkit-ink/ios/MlkitInk.podspec`
-- Drawing: `react-native-svg` + core `PanResponder` — chosen because it runs on all three platforms
-  with no extra native setup. Propose Skia only if we measure dropped points or lag on a real device.
+- Drawing: `@excalidraw/excalidraw` — the shared canvas, embedded on Android/iOS through Expo's
+  bundled DOM WebView. It runs directly in the browser/desktop build. Native ML Kit receives
+  timed strokes through the existing adapter; it does not recognize canvas screenshots.
 - Anything else: ask first.
 
 ## Platform work beyond the recognizer
 
-The canvas captures `x`, `y`, `t` everywhere. These need platform knowledge and belong to the platform
-owners (details in each native `TODO.md`):
+The Excalidraw canvas reuses `harness/src/capture/TimedInkCapture.ts` to capture `x`, `y`, `t` in
+scene coordinates, including coalesced pointer events. Real pen pressure and the dominant pointer
+type are included when the WebView reports them. Verify these on physical devices:
 
 - Real stylus **pressure** (`p`), only for pen input, never for fingers
-- **Input device** per page (`pen` / `touch` / `mouse`) → `metadata.source.inputDevice` (now `unknown`)
+- **Input device** per page (`pen` / `touch` / `mouse`) → `metadata.source.inputDevice`
 - **Palm rejection** when a pen is active
+
+Use Excalidraw's Undo/Redo and eraser; native controls never edit a separate stroke list.
+The host Clear button resets the Excalidraw scene, history, and timed capture in place, then
+starts a new capture session and discards delayed messages from the old one. The WebView stays
+mounted so pending Expo DOM replies can finish without targeting a destroyed native view.
+Imported ink and rotation/resizing/flipping of captured ink block recognition/export until undone
+or redrawn, since the MVP does not reconstruct timed trajectories for those edits. Translations
+are supported. Non-freehand shapes and typed text are not handwriting recognition input.
+
+`metro.config.js` resolves Excalidraw's CSS and embeds its UI fonts locally. DOM bundle splitting
+is disabled to avoid Expo 58's native export references to renamed common chunks. The handwriting
+canvas is packaged with the app; it does not load excalidraw.com. Excalidraw's optional text-font
+features can still request its upstream font assets; offline verification here concerns freehand ink.
 
 ## Testing
 
 - **Unit, any OS:** `npm test` at the repo root runs `ink/` (pipeline, layout, schema, native adapter)
-  and `recog_mvp/`. `npm run typecheck` checks `ink` and `app`.
+  and `recog_mvp/`, plus timed Excalidraw capture tests. `npm run typecheck` checks `ink` and `app`.
 - **Android:** emulator for the flow, a real stylus device for pressure and point density.
 - **iOS:** simulator for the flow, a real iPad with Apple Pencil for pressure and point density.
 - **Cross-platform:** write the same word on each platform, export, and diff the JSON. It should have

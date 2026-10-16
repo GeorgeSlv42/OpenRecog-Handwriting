@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Excalidraw } from '@excalidraw/excalidraw'
+import { Excalidraw, viewportCoordsToSceneCoords } from '@excalidraw/excalidraw'
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import '@excalidraw/excalidraw/index.css'
 import './App.css'
@@ -36,7 +36,7 @@ function App() {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const captureRef = useRef<TimedInkCapture | null>(null)
-  captureRef.current ??= new TimedInkCapture(() => apiRef.current?.getAppState() ?? null)
+  captureRef.current ??= new TimedInkCapture(() => apiRef.current?.getAppState() ?? null, viewportCoordsToSceneCoords)
   const createdAtRef = useRef(new Date().toISOString())
 
   const [label, setLabel] = useState('')
