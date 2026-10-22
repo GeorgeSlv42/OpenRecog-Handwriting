@@ -97,7 +97,7 @@ Each result:
 | `target` | Exactly one of `{ lineId }` or `{ gestureId }` |
 | `best` | Text of the rank-1 candidate, or `null` if the engine returned nothing |
 | `candidates[]` | `{ rank, text, score }`, best-first, rank starts at 1 |
-| `candidates[].score` | The engine's raw score, **unnormalized**, `null` if not provided. Do not read it as a 0..1 probability; its direction and scale are engine-specific. Use `rank` for ordering. |
+| `candidates[].score` | The engine's raw score, **unnormalized**, `null` if not provided. Do not read it as a 0..1 probability; its direction and scale are engine-specific. Use `rank` for ordering. ML Kit Digital Ink populates `score` for shape and gesture classifiers (lower is more likely; values may be negative). Text models usually omit it (`null`). Windows Ink never provides a score. |
 
 Lines are recognized in reading order, each with the previously recognized text as context.
 

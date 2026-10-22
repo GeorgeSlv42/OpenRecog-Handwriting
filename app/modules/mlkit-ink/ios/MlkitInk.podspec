@@ -12,8 +12,8 @@ Pod::Spec.new do |s|
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
-  # ML Kit Digital Ink goes here (approved): s.dependency 'GoogleMLKit/DigitalInkRecognition', '<version>'
-  # Take the version from the ML Kit iOS release notes, then run `npx pod-install` / `npm run ios`.
+  # ML Kit iOS 9.0.0 (release notes, 2025-06-27): https://developers.google.com/ml-kit/release-notes
+  s.dependency 'GoogleMLKit/DigitalInkRecognition', '9.0.0'
 
   # Swift/Objective-C compatibility
   s.pod_target_xcconfig = {

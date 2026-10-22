@@ -5,7 +5,7 @@ export interface RecognizerSetup {
   /** Null when this platform has no recognizer; the app still captures and exports. */
   recognizer: InkRecognizer | null
   source: Omit<Metadata['source'], 'inputDevice'>
-  /** Null skips gesture detection (always null until the gesture model id is confirmed). */
+  /** Null skips gesture detection. On iOS/Android this is the ML Kit `-x-gesture` model id. */
   gestureModelId: string | null
   /** False when models come from the OS (Windows) and can't be downloaded by the app. */
   canManageModels: boolean

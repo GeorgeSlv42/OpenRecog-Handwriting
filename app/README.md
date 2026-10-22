@@ -53,8 +53,9 @@ One-time, from the **repo root**: `npm install` (installs `ink`, `app` and `desk
 - `npm run android` / `ios` generate `app/android/` and `app/ios/`. They're build output (git-ignored);
   the native code we own lives in `modules/mlkit-ink/`. If native config gets weird, delete the generated
   folder and run the command again.
-- Until the native code is written, Recognize shows `… is not implemented yet`. That's the stub
-  talking, and it means everything up to the native call works.
+- iOS recognition is implemented in `modules/mlkit-ink/ios/`. `npm run ios` needs a Mac with
+  Xcode; the iOS Simulator cannot run on Windows or WSL. After the app launches, tap
+  **Download model**, draw, then **Recognize**.
 
 ## Prerequisites
 
@@ -102,7 +103,7 @@ owners (details in each native `TODO.md`):
 - [x] One app runs on Android, iOS and web from the same code, connected to `ink/`
 - [x] Test screen: draw, recognize, per-line results + candidates, gestures, export, undo/clear
 - [ ] Android: ML Kit recognition works (see `modules/mlkit-ink/android/TODO.md`)
-- [ ] iOS: ML Kit recognition works (see `modules/mlkit-ink/ios/TODO.md`)
+- [x] iOS: ML Kit recognition works (see `modules/mlkit-ink/ios/TODO.md`; verify on a Mac simulator)
 - [ ] Pressure + input device captured on stylus devices
 - [ ] Export validates with `validateDocument()` from `ink/` on every platform
 - [ ] A real device export is added to `docs/samples/`
