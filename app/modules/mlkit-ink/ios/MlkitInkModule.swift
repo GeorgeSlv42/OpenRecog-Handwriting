@@ -85,10 +85,17 @@ public class MlkitInkModule: Module {
   }
 
   private func model(for modelId: String) throws -> DigitalInkRecognitionModel {
-    guard let identifier = DigitalInkRecognitionModelIdentifier(forLanguageTag: modelId) else {
+    var identifier = DigitalInkRecognitionModelIdentifier(forLanguageTag: modelId)
+    if identifier == nil {
+      identifier = try? DigitalInkRecognitionModelIdentifier.from(languageTag: modelId)
+    }
+    if identifier == nil {
+      NSLog("[MlkitInk] Unknown model: %@. Available matching: %@", modelId, DigitalInkRecognitionModelIdentifier.allModelIdentifiers().compactMap { $0.languageTag }.filter { $0.contains("gesture") || $0.hasPrefix("en") })
+    }
+    guard let id = identifier else {
       throw InvalidModelIdException(modelId)
     }
-    return DigitalInkRecognitionModel(modelIdentifier: identifier)
+    return DigitalInkRecognitionModel(modelIdentifier: id)
   }
 
   private func downloadModel(modelId: String, wifiOnly: Bool, promise: Promise) {

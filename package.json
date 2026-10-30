@@ -15,5 +15,14 @@
     "test": "npm test -w @openrecog-handwriting/ink && node --test \"recog_mvp/*.test.ts\"",
     "typecheck": "npm run typecheck -w @openrecog-handwriting/ink && npm run typecheck -w @openrecog-handwriting/app",
     "check": "npm run typecheck && npm test"
+  },
+  "version": "1.0.0",
+  "dependencies": {
+    "expo": "~58.0.11",
+    "react": "19.3.0",
+    "react-native": "0.88.0"
+  },
+  "devDependencies": {
+    "@types/react-native": "^0.72.8"
   }
 }
