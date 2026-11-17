@@ -39,6 +39,11 @@ class WritingArea : Record {
   @Field val height: Double = 0.0
 }
 
+class StructuredStroke : Record {
+  @Field val strokeId: String = ""
+  @Field val points: List<InkPoint> = emptyList()
+}
+
 class MlkitInkModule : Module() {
   private val modelManager by lazy { RemoteModelManager.getInstance() }
   // Serialize model deletion/download with recognition so a model cannot disappear mid-call.
@@ -79,32 +84,24 @@ class MlkitInkModule : Module() {
     // Returns [{ text, score }] best-first; score is null when the engine has none.
     AsyncFunction("recognize") Coroutine { modelId: String, strokes: List<List<InkPoint>>, preContext: String?, writingArea: WritingArea? ->
       operation("RECOGNITION_FAILED", "Could not recognize ink with '$modelId'") {
-        val target = model(modelId)
-        val ink = buildInk(strokes)
-        val context = RecognitionContext.builder().apply {
-          // ML Kit 19 requires this builder property even for the first line of ink.
-          setPreContext(preContext ?: "")
-          if (writingArea != null) {
-            require(writingArea.width.toFloat().isFinite() && writingArea.width > 0 &&
-              writingArea.height.toFloat().isFinite() && writingArea.height > 0) {
-              "Writing area must have finite, positive dimensions"
-            }
-            setWritingArea(MlKitWritingArea(writingArea.width.toFloat(), writingArea.height.toFloat()))
-          }
-        }.build()
-        if (!modelManager.isModelDownloaded(target).awaitResult()) {
-          throw CodedException("MODEL_NOT_DOWNLOADED", "Download model '$modelId' before recognizing ink", null)
+        recognizeCandidates(modelId, strokes, preContext, writingArea)
+      }
+    }
+
+    // Android-only extension: the shared line-recognition contract remains unchanged.
+    AsyncFunction("recognizeStructure") Coroutine { modelId: String, strokes: List<StructuredStroke> ->
+      operation("RECOGNITION_FAILED", "Could not analyze word links with '$modelId'") {
+        require(strokes.all { it.strokeId.isNotBlank() } && strokes.map { it.strokeId }.distinct().size == strokes.size) {
+          "Each stroke must have a unique, nonempty ID"
         }
-        // Starting a task and destroying the module must not race to create a leaked client.
-        val task = synchronized(lifecycleLock) {
-          check(!destroyed) { "Recognition module has been destroyed" }
-          val recognizer = recognizers.getOrPut(modelId) {
-            DigitalInkRecognition.getClient(DigitalInkRecognizerOptions.builder(target).build())
-          }
-          recognizer.recognize(ink, context)
-        }
-        task.awaitResult().candidates.map { candidate ->
-          mapOf<String, Any?>("text" to candidate.text, "score" to candidate.score)
+        buildInk(strokes.map { it.points }) // Validate every coordinate and timestamp before grouping.
+        val byId = strokes.associateBy { it.strokeId }
+        val layout = structureInk(strokes.map { stroke ->
+          InkTrace(stroke.strokeId, stroke.points.map { InkSample(it.x, it.y, it.t) })
+        })
+        recognizeStructuredInk(layout) { group, context ->
+          recognizeCandidates(modelId, group.map { byId.getValue(it.id).points }, context, null)
+            .map { it.getValue("text") as String }
         }
       }
     }
@@ -115,6 +112,41 @@ class MlkitInkModule : Module() {
         recognizers.values.forEach { it.close() }
         recognizers.clear()
       }
+    }
+  }
+
+  private suspend fun recognizeCandidates(
+    modelId: String,
+    strokes: List<List<InkPoint>>,
+    preContext: String?,
+    writingArea: WritingArea?,
+  ): List<Map<String, Any?>> {
+    val target = model(modelId)
+    val ink = buildInk(strokes)
+    val context = RecognitionContext.builder().apply {
+      // ML Kit 19 requires this builder property even for the first line of ink.
+      setPreContext(preContext ?: "")
+      if (writingArea != null) {
+        require(writingArea.width.toFloat().isFinite() && writingArea.width > 0 &&
+          writingArea.height.toFloat().isFinite() && writingArea.height > 0) {
+          "Writing area must have finite, positive dimensions"
+        }
+        setWritingArea(MlKitWritingArea(writingArea.width.toFloat(), writingArea.height.toFloat()))
+      }
+    }.build()
+    if (!modelManager.isModelDownloaded(target).awaitResult()) {
+      throw CodedException("MODEL_NOT_DOWNLOADED", "Download model '$modelId' before recognizing ink", null)
+    }
+    // Starting a task and destroying the module must not race to create a leaked client.
+    val task = synchronized(lifecycleLock) {
+      check(!destroyed) { "Recognition module has been destroyed" }
+      val recognizer = recognizers.getOrPut(modelId) {
+        DigitalInkRecognition.getClient(DigitalInkRecognizerOptions.builder(target).build())
+      }
+      recognizer.recognize(ink, context)
+    }
+    return task.awaitResult().candidates.map { candidate ->
+      mapOf("text" to candidate.text, "score" to candidate.score)
     }
   }
 

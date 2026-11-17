@@ -46,6 +46,48 @@ Choose `en-US`, tap **Download**, draw a word, and tap **Recognize**. Expand the
 candidates, then export the document. The shared pipeline also downloads missing models on demand.
 After the model is downloaded, recognition works offline.
 
+## Word links and diagram preview
+
+After the existing line results, Android runs a separate `recognizeStructure` pass and displays
+**Word links & diagrams**. Each chain shows `null ↔ #1 word ↔ #2 word ↔ null`; each word also
+shows its previous/next neighbours. Tap it for its ID, source strokes, and recognition alternatives.
+The original line results remain available. A failed or outdated second pass cannot replace them.
+
+`InkStructure.kt` groups freehand strokes using local alignment and spacing, attaches nearby small
+marks, and recognizes each group with up to 20 preceding characters through ML Kit. Linking uses
+the local row height and continues onto nearby, left-aligned rows written afterward when both rows
+form unbroken runs. Large gaps, columns, different diagram regions, and unread groups break links. IDs reference the input
+stroke IDs for that recognition snapshot. If ML Kit returns multiple words from one group, they
+have separate links but explicitly share an unresolved ink boundary; no individual word boxes are
+fabricated. This preview is designed for left-to-right, space-separated writing.
+
+The same pass estimates large closed outlines, cells bounded by four intersecting straight rules,
+and straight connectors between outlines. Labels have their own word chains within shapes/cells.
+These are geometric suggestions, not full diagram understanding: curved branches, arrow direction,
+multi-stroke outlines, and complex or sparsely labelled layouts are not reliably interpreted.
+Use the **freehand pen** for these tests; the existing capture layer only supplies timed freehand
+strokes, not Excalidraw's rectangle, arrow, table, or typed-text objects.
+
+Dense, late scribbles can produce cross-out and above-word replacement suggestions. They do not
+delete words or rewire links automatically. Use the existing eraser/undo to apply an actual edit.
+The preview is recomputed after recognition and is not part of the shared v1 JSON export.
+
+The implementation and results component live in this Android directory. The only shared-screen
+change imports and mounts `StructuredResults` after the existing results; it renders nothing on
+iOS/web and reports a rebuild hint if an older Android binary lacks the new native method.
+
+Run the native geometry/link tests from the generated `app/android` host:
+
+```powershell
+.\gradlew.bat :mlkit-ink:testDebugUnitTest
+```
+
+Tests cover separated phrases/rows, delayed dots, ID-based links, table isolation, labelled shapes
+and connectors, sparse pen segments in cross-outs, replacement suggestions, unresolved boundaries,
+unread words, punctuation, and context limits. They use scripted recognition text; real handwriting
+accuracy still depends on ML Kit and the writer's spacing. Rebuild with `npm run android` after
+native changes; Metro reload alone cannot update Kotlin code.
+
 To compile just the module after generating the host:
 
 ```powershell

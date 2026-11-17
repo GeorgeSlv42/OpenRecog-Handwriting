@@ -14,6 +14,7 @@ import type { InkCanvasSnapshot } from '../components/inkCanvasTypes'
 import { DEFAULTS } from '../config'
 import { shareDocument } from '../export/shareDocument'
 import { createRecognizer } from '../recognizer/createRecognizer'
+import { StructuredResults } from '../../modules/mlkit-ink/android/StructuredResults'
 
 type ModelState = 'checking' | 'ready' | 'missing' | 'busy' | 'error' | 'none'
 
@@ -204,6 +205,7 @@ export function RecognizeScreen() {
             gesture {g.type} → {g.effect} ({g.targetStrokeIds.length} strokes)
           </Text>
         ))}
+        <StructuredResults document={doc} />
       </ScrollView>
     </View>
   )

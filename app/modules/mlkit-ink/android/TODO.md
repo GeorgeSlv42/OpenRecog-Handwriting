@@ -3,7 +3,7 @@
 **Owner:** Dev A
 
 Implements the contract in [`docs/recognizer-contract.md`](../../../../docs/recognizer-contract.md).
-Nothing more. Your file: [`src/main/java/expo/modules/mlkitink/MlkitInkModule.kt`](src/main/java/expo/modules/mlkitink/MlkitInkModule.kt).
+The Android-only `recognizeStructure` extension and results preview are documented in [README.md](README.md).
 The four native methods are implemented. See [README.md](README.md) for setup and the device
 acceptance checklist. Build/device verification remains separate from implementation.
 
