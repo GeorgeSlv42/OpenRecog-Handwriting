@@ -25,13 +25,37 @@ class InkStructureTest {
     assertEquals(listOf("a", "b", "dot"), layout.words.single().strokes.map { it.id })
   }
 
-  @Test fun `local row height links a tall initial to a widely spaced word`() {
+  @Test fun `local text height links a tall initial to a nearby word`() {
     val layout = structureInk(listOf(
       trace("initial", 0.0 to 0.0, 0.0 to 40.0),
-      letter("a", 65.0, 20.0, 100.0), letter("b", 75.0, 20.0, 110.0), letter("c", 85.0, 20.0, 120.0),
+      letter("a", 35.0, 20.0, 100.0), letter("b", 45.0, 20.0, 110.0), letter("c", 55.0, 20.0, 120.0),
     ))
     assertEquals(2, layout.words.size)
     assertSame(layout.words[0], layout.words[1].previous)
+  }
+
+  @Test fun `horizontal gaps use local text scale despite large neighbors and page median`() {
+    for (scale in listOf(0.5, 1.0, 3.0)) {
+      val ink = listOf(letter("a", 0.0, 60.0), letter("b", 30.0, 60.0), letter("c", 83.0, 60.0)) +
+        (0..6).map { trace("large$it", (300.0 + it * 20) to 0.0,
+          (304.0 + it * 20) to 80.0, (308.0 + it * 20) to 0.0) }
+      val layout = recognitionRuns(structureInk(ink.map { s -> s.copy(points = s.points.map {
+        it.copy(x = it.x * scale - 100, y = it.y * scale - 100)
+      }) }))
+      val first = layout.words.single { word -> word.strokes.any { it.id == "a" } }
+      assertEquals(listOf("a", "b"), first.strokes.map { it.id })
+      val separate = layout.words.single { word -> word.strokes.any { it.id == "c" } }
+      assertNull(separate.previous)
+    }
+  }
+
+  @Test fun `large text keeps wide word spaces despite smaller text elsewhere`() {
+    val ink = (0..7).map { letter("small$it", it * 10.0) } + listOf(
+      trace("large1", 300.0 to 200.0, 304.0 to 280.0, 308.0 to 200.0),
+      trace("large2", 398.0 to 200.0, 402.0 to 280.0, 406.0 to 200.0),
+    )
+    val runs = recognitionRuns(structureInk(ink))
+    assertTrue(runs.words.any { it.strokes.map { stroke -> stroke.id } == listOf("large1", "large2") })
   }
 
   @Test fun `large letters stay in one word beside much smaller handwriting`() {
@@ -67,6 +91,51 @@ class InkStructureTest {
     val paragraphs = structureInk(listOf(letter("a", 0.0), letter("b", 30.0),
       letter("c", 0.0, 90.0, 100.0), letter("d", 30.0, 90.0, 110.0)))
     assertNull(paragraphs.words[2].previous)
+  }
+
+  @Test fun `side by side blocks each wrap and keep recognition context independent`() = runBlocking {
+    val layout = structureInk(listOf(
+      letter("left1", 0.0), letter("left2", 30.0, time = 10.0),
+      letter("right1", 150.0, time = 20.0), letter("right2", 180.0, time = 30.0),
+      letter("left3", 0.0, 40.0, 100.0), letter("left4", 30.0, 40.0, 110.0),
+      letter("right3", 150.0, 40.0, 120.0), letter("right4", 180.0, 40.0, 130.0),
+    ))
+    val contexts = mutableMapOf<String, String>()
+    val result = recognizeStructuredInk(layout) { strokes, context ->
+      val id = strokes.first().id
+      contexts[id] = context
+      listOf(id)
+    }
+    @Suppress("UNCHECKED_CAST") val words = result["words"] as List<Map<String, Any?>>
+    val byText = words.associateBy { it["text"] }
+    assertEquals(2, words.count { it["prev"] == null })
+    assertEquals(2, words.count { it["next"] == null })
+    for (prefix in listOf("left", "right")) {
+      for (i in 1..3) {
+        assertEquals(byText["$prefix${i + 1}"]!!["id"], byText["$prefix$i"]!!["next"])
+        assertEquals(byText["$prefix$i"]!!["id"], byText["$prefix${i + 1}"]!!["prev"])
+      }
+      assertEquals("", contexts["${prefix}1"])
+      assertEquals("${prefix}1 ${prefix}2 ", contexts["${prefix}3"])
+    }
+  }
+
+  @Test fun `staggered text blocks retain independent continuation frontiers at any scale`() {
+    val ink = listOf(
+      letter("left1", 0.0), letter("left2", 30.0, time = 10.0),
+      letter("right1", 150.0, 25.0, 20.0), letter("right2", 180.0, 25.0, 30.0),
+      letter("left3", 0.0, 40.0, 100.0), letter("left4", 30.0, 40.0, 110.0),
+      letter("right3", 150.0, 65.0, 120.0), letter("right4", 180.0, 65.0, 130.0),
+    )
+    for (scale in listOf(0.5, 1.0, 3.0)) {
+      val layout = structureInk(ink.map { stroke ->
+        stroke.copy(points = stroke.points.map { it.copy(x = it.x * scale - 200, y = it.y * scale - 100) })
+      })
+      val words = layout.words.associateBy { it.strokes.first().id }
+      assertSame(words["left2"], words["left3"]!!.previous)
+      assertSame(words["right2"], words["right3"]!!.previous)
+      assertEquals(2, layout.words.count { it.previous == null })
+    }
   }
 
   @Test fun `a late annotation above a row does not become its predecessor`() {
@@ -120,7 +189,7 @@ class InkStructureTest {
       letter("new1", 2.0, -30.0, 200.0), letter("new2", 12.0, -30.0, 210.0)))
     assertEquals(2, layout.words.size)
     assertTrue(layout.words.flatMap { it.strokes }.any { it.id == "old1" })
-    assertFalse(layout.words.flatMap { it.strokes }.any { it.id == "scribble" })
+    assertTrue(layout.words.flatMap { it.strokes }.any { it.id == "scribble" })
     assertEquals(listOf("word:old1"), layout.corrections.single()["targetGroupIds"])
     assertEquals("word:new1", layout.corrections.single()["replacementGroupId"])
   }
@@ -133,7 +202,7 @@ class InkStructureTest {
       listOf(when (strokes.first().id) { "a" -> "Hello"; "b" -> " World!"; else -> "Wait," })
     }
     @Suppress("UNCHECKED_CAST") val words = result["words"] as List<Map<String, Any?>>
-    assertEquals(listOf("", "Hello", ""), contexts)
+    assertEquals(listOf("", "Hello ", ""), contexts)
     assertEquals("World!", words[1]["text"])
     assertEquals(words[1]["id"], words[0]["next"])
     assertEquals(words[0]["id"], words[1]["prev"])
@@ -163,6 +232,64 @@ class InkStructureTest {
     val layout = structureInk(listOf(letter("a", 0.0), letter("b", 25.0)))
     val contexts = mutableListOf<String>()
     recognizeStructuredInk(layout) { _, context -> contexts += context; listOf("abcdefghijklmnopqrstuvwxyz") }
-    assertEquals(listOf("", "ghijklmnopqrstuvwxyz"), contexts)
+    assertEquals(listOf("", "hijklmnopqrstuvwxyz "), contexts)
+  }
+
+  @Test fun `recognition combines fragments into row runs without crossing columns or rows`() = runBlocking {
+    val layout = recognitionRuns(structureInk(listOf(
+      letter("left1", 0.0), letter("left2", 30.0, time = 10.0),
+      letter("right1", 150.0, time = 20.0), letter("right2", 180.0, time = 30.0),
+      letter("left3", 0.0, 40.0, 100.0), letter("left4", 30.0, 40.0, 110.0),
+      letter("right3", 150.0, 40.0, 120.0), letter("right4", 180.0, 40.0, 130.0),
+    )))
+    val calls = mutableListOf<List<String>>()
+    val contexts = mutableListOf<String>()
+    val result = recognizeStructuredInk(layout) { strokes, context ->
+      calls += strokes.map { it.id }
+      contexts += context
+      listOf(strokes.joinToString(" ") { it.id })
+    }
+    assertEquals(listOf(listOf("left1", "left2"), listOf("right1", "right2"),
+      listOf("left3", "left4"), listOf("right3", "right4")), calls)
+    assertEquals(listOf("", "", "left1 left2 ", "right1 right2 "), contexts)
+    @Suppress("UNCHECKED_CAST") val words = result["words"] as List<Map<String, Any?>>
+    assertEquals(8, words.size)
+    assertEquals(2, words.count { it["prev"] == null })
+    assertEquals(2, words.count { it["next"] == null })
+    assertTrue(words.all { it["sharedInk"] == true })
+    val byId = words.associateBy { it["id"] }
+    words.forEach { word ->
+      word["next"]?.let { assertEquals(word["id"], byId[it]!!["prev"]) }
+    }
+  }
+
+  @Test fun `recognition runs preserve drawing order and do not mutate layout groups`() {
+    val layout = structureInk(listOf(letter("right", 30.0), letter("left", 0.0, time = 100.0)))
+    val runs = recognitionRuns(layout)
+    assertEquals(2, layout.words.size)
+    assertEquals(listOf("right", "left"), runs.words.single().strokes.map { it.id })
+    assertTrue(layout.words.all { it.strokes.size == 1 })
+  }
+
+  @Test fun `unconfirmed tall straight strokes are retained for recognition`() {
+    val small = (0..7).map { letter("small$it", it * 10.0) }
+    val stem = trace("stem", 200.0 to 0.0, 200.0 to 80.0, time = 100.0)
+    val layout = structureInk(small + stem)
+    assertFalse(layout.drawingStrokeIds.contains("stem"))
+    assertTrue(layout.words.flatMap { it.strokes }.any { it.id == "stem" })
+  }
+
+  @Test fun `correction references resolve after groups merge into recognition runs`() {
+    val layout = structureInk(listOf(letter("a", 0.0), letter("b", 30.0, time = 10.0),
+      letter("replacement", 0.0, -40.0, 100.0)))
+    val annotated = layout.copy(corrections = listOf(mapOf(
+      "strokeId" to "mark", "targetGroupIds" to listOf("word:a", "word:b"),
+      "replacementGroupId" to "word:replacement",
+    )))
+    val runs = recognitionRuns(annotated)
+    val correction = runs.corrections.single()
+    assertEquals(listOf("word:a"), correction["targetGroupIds"])
+    assertEquals("word:replacement", correction["replacementGroupId"])
+    assertTrue(runs.words.any { it.id == correction["replacementGroupId"] })
   }
 }

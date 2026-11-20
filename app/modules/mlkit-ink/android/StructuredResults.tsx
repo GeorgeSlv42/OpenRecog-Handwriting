@@ -74,7 +74,7 @@ export function StructuredResults({ document }: { document: NoteDocument | null 
     <View style={styles.panel}>
       <Text style={styles.heading}>Word links & diagrams · preview</Text>
       <Text style={styles.hint}>Links follow nearby words and continue onto aligned rows. Uncertain gaps and separate diagram labels stay unlinked. Tap a word for its metadata.</Text>
-      {!active ? <Text style={styles.hint}>Recognizing individual word groups…</Text> : null}
+      {!active ? <Text style={styles.hint}>Recognizing text runs…</Text> : null}
       {active?.error ? <Text style={styles.warning}>{active.error}</Text> : null}
       {chains.map((chain, index) => (
         <View key={chain[0].id} style={styles.chain}>

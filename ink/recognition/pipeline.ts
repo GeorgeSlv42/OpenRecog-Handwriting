@@ -134,21 +134,28 @@ export async function recognizeDocument(
     const results: RecognitionResult[] = []
     const nextResultId = () => formatId('r', results.length + 1, 3)
     let written = ''
+    const blockByLine = new Map(doc.structure.blocks.flatMap(block =>
+      block.lines.map(line => [line.lineId, block.blockId] as const)))
+    let previousBlock: string | undefined
 
     for (const line of linesInReadingOrder(doc.structure)) {
+      line.recognitionId = null
+      const blockId = blockByLine.get(line.lineId)
+      if (blockId !== previousBlock) written = ''
+      previousBlock = blockId
       const kept = line.strokeIds
         .filter((id) => !deletedStrokeIds.has(id))
         .map((id) => strokeById.get(id)!)
-      if (kept.length === 0) continue
+      if (kept.length === 0) { written = ''; continue }
       const candidates = await recognizer.recognize(modelId, kept, {
-        preContext: tail(written, opts.preContextChars) || undefined,
+        preContext: tail(written ? `${written} ` : '', opts.preContextChars) || undefined,
         writingArea: opts.lineWritingArea ? { width: line.bbox.w, height: line.bbox.h } : undefined,
       })
       const recognitionId = nextResultId()
       const best = candidates[0]?.text ?? null
       results.push({ recognitionId, target: { lineId: line.lineId }, best, candidates })
       line.recognitionId = recognitionId
-      if (best) written = written ? `${written} ${best}` : best
+      written = best?.trim() ? (written ? `${written} ${best.trim()}` : best.trim()) : ''
     }
 
     for (const gesture of doc.gestures) {

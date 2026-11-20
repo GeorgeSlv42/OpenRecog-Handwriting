@@ -27,9 +27,45 @@ test('recognizes lines in reading order with pre-context', async () => {
   assert.ok(lines.every((l) => l.recognitionId))
   const textCalls = r.calls.filter((c) => c.modelId === TEXT_MODEL)
   assert.equal(textCalls[0].options?.preContext, undefined)
-  assert.equal(textCalls[1].options?.preContext, doc.recognition.results[0].best)
+  assert.equal(textCalls[1].options?.preContext, `${doc.recognition.results[0].best} `)
   assert.equal(doc.recognition.results[0].candidates.length, 2)
   assert.deepEqual(validateDocument(doc).errors, [])
+})
+
+test('independent columns do not share recognition context', async () => {
+  const pen = new Pen()
+  const input = buildDocument({ ids: IDS, language: TEXT_MODEL, source: SOURCE,
+    canvas: { width: 800, height: 600 }, strokes: [
+      ...pen.word(0, 0, 2), ...pen.word(0, 40, 2),
+      ...pen.word(200, 0, 2), ...pen.word(200, 40, 2),
+    ] })
+  assert.equal(input.structure.blocks.length, 2)
+  const r = new FakeRecognizer()
+  await recognizeDocument(input, r)
+  assert.deepEqual(r.calls.map(call => call.options?.preContext), [undefined, 'aa ', undefined, 'aa '])
+})
+
+test('an unread line breaks recognition context', async () => {
+  const pen = new Pen()
+  const input = buildDocument({ ids: IDS, language: TEXT_MODEL, source: SOURCE,
+    canvas: { width: 800, height: 600 }, strokes: [
+      ...pen.word(0, 0, 2), ...pen.word(0, 40, 2), ...pen.word(0, 80, 2),
+    ] })
+  const r = new FakeRecognizer()
+  const original = r.recognize.bind(r)
+  r.recognize = async (...args) => {
+    const candidates = await original(...args)
+    return r.calls.length === 2 ? [] : candidates
+  }
+  const result = await recognizeDocument(input, r)
+  assert.deepEqual(r.calls.map(call => call.options?.preContext), [undefined, 'aa ', undefined])
+  assert.deepEqual(validateDocument(result).errors, [])
+})
+
+test('word boundary is included in the twenty character context budget', async () => {
+  const r = new FakeRecognizer()
+  await recognizeDocument(notes(), r, { preContextChars: 3 })
+  assert.equal(r.calls[1].options?.preContext, 'aa ')
 })
 
 test('downloads missing models before recognizing', async () => {

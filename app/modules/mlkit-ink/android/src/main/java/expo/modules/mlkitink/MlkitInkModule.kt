@@ -99,7 +99,7 @@ class MlkitInkModule : Module() {
         val layout = structureInk(strokes.map { stroke ->
           InkTrace(stroke.strokeId, stroke.points.map { InkSample(it.x, it.y, it.t) })
         })
-        recognizeStructuredInk(layout) { group, context ->
+        recognizeStructuredInk(recognitionRuns(layout)) { group, context ->
           recognizeCandidates(modelId, group.map { byId.getValue(it.id).points }, context, null)
             .map { it.getValue("text") as String }
         }

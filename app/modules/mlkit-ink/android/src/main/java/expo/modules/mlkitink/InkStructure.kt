@@ -116,6 +116,12 @@ internal fun structureInk(strokes: List<InkTrace>): InkLayout {
     else mapOf("from" to from.id, "to" to to.id, "strokeId" to rule.id)
   }
 
+  // A long straight stroke alone may be a letter stem. Only remove it from text
+  // when a complete cell or a connector between identified shapes corroborates it.
+  val confirmedRules = regions.filter { it.kind == "cell" }.flatMap { it.strokeIds }.toSet() +
+    connections.mapNotNull { it["strokeId"] }
+  drawing.removeAll(rules.filter { it.id !in confirmedRules }.map { it.id }.toSet())
+
   // A late, dense back-and-forth mark is only a correction suggestion, never an automatic deletion.
   val scribbles = strokes.filter { stroke ->
     val directions = stroke.points.zipWithNext().map { (a, b) -> b.x - a.x }.filter { abs(it) > textHeight * 0.08 }
@@ -126,7 +132,8 @@ internal fun structureInk(strokes: List<InkTrace>): InkLayout {
           earlier.intersects(stroke.box)
       }
   }
-  val excluded = drawing + scribbles.map { it.id }
+  // A suspected correction is not an instruction to erase ink from recognition.
+  val excluded = drawing
   val remaining = strokes.filter { it.id !in excluded }
   val words = mutableListOf<WordInk>()
   val byRegion = remaining.groupBy { stroke ->
@@ -134,8 +141,26 @@ internal fun structureInk(strokes: List<InkTrace>): InkLayout {
       .minByOrNull { it.box.width * it.box.height }?.id
   }
   for ((regionId, regionStrokes) in byRegion) {
+    // Scale horizontal gaps using nearby, comparable-height writing on each side.
+    // This estimate is independent of the page median and the full row bounds.
+    val localHeights = regionStrokes.associateWith { stroke ->
+      val s = stroke.box
+      val heights = regionStrokes.filter { other ->
+        val b = other.box
+        val gap = max(0.0, max(s.left - b.right, b.left - s.right))
+        b.height > 0 && b.height >= s.height * 0.5 && b.height <= s.height * 2 &&
+          gap <= 1.8 * min(s.height, b.height) &&
+          min(s.bottom, b.bottom) - max(s.top, b.top) >= min(s.height, b.height) * 0.45
+      }.map { it.box.height }.sorted()
+      max(if (heights.isEmpty()) 1.0 else (heights[(heights.size - 1) / 2] + heights[heights.size / 2]) / 2, 1.0)
+    }
     val rows = mutableListOf<MutableList<InkTrace>>()
-    val marks = regionStrokes.filter { it.box.height < textHeight * 0.3 }
+    val marks = regionStrokes.filter { stroke -> regionStrokes.any { other ->
+      val gap = max(0.0, max(stroke.box.left - other.box.right, other.box.left - stroke.box.right))
+      stroke !== other && stroke.box.height < other.box.height * 0.3 &&
+        gap <= other.box.height * 0.3 &&
+        other.box.distance((stroke.box.left + stroke.box.right) / 2, stroke.box.centerY) < other.box.height * 0.8
+    } }
     for (stroke in regionStrokes.filter { it !in marks }.sortedBy { it.box.centerY }) {
       val row = rows.filter { row ->
         val band = row.map { it.box }.reduce(InkBox::union)
@@ -152,41 +177,68 @@ internal fun structureInk(strokes: List<InkTrace>): InkLayout {
       if (row != null && row.minOf { it.box.distance((mark.box.left + mark.box.right) / 2, mark.box.centerY) } < max(textHeight, row.maxOf { it.box.height }) * 0.8) row += mark
       else rows += mutableListOf(mark)
     }
-    var previousRow = emptyList<WordInk>()
-    var previousBox: InkBox? = null
+    // Keep a separate continuation frontier for each horizontal text run. A row can
+    // contain several columns; a gap in one must not break wrapping in the others.
+    val previousRuns = mutableListOf<List<WordInk>>()
     for (row in rows.sortedBy { it.minOf { s -> s.box.top } }) {
-      val rowBox = row.map { it.box }.reduce(InkBox::union)
-      val letterHeights = row.filter { it !in marks }.map { it.box.height }.sorted()
-      val letterHeight = letterHeights.getOrElse(letterHeights.size / 2) { textHeight }
       val rowWords = mutableListOf<WordInk>()
       var current: WordInk? = null
       for (stroke in row.sortedBy { it.box.left }) {
         val gap = current?.let { stroke.box.left - it.box.right } ?: Double.POSITIVE_INFINITY
+        val nearest = current?.strokes?.minByOrNull {
+          max(0.0, max(stroke.box.left - it.box.right, it.box.left - stroke.box.right))
+        }
+        // Small attached marks must not shrink the word's spacing scale.
+        val body = current?.strokes?.filter { it !in marks }.orEmpty()
+        val priorHeight = body.minByOrNull { abs(it.box.right - stroke.box.left) }
+          ?.let { localHeights.getValue(it) } ?: nearest?.let { localHeights.getValue(it) }
+        val incomingHeight = if (stroke in marks && priorHeight != null) priorHeight else localHeights.getValue(stroke)
+        val letterHeight = min(incomingHeight, priorHeight ?: incomingHeight)
         if (current != null && gap <= letterHeight * 0.6) current.strokes += stroke
         else {
           val next = WordInk(mutableListOf(stroke), regionId)
-          // Ascenders and capitals make the local row taller than the median pen stroke.
-          if (gap <= max(textHeight, rowBox.height) * 1.8) next.previous = current
+          if (gap <= letterHeight * 1.8) next.previous = current
           words += next
           rowWords += next
           current = next
         }
       }
-      val above = previousBox
-      if (above != null && previousRow.isNotEmpty()) {
-        val height = max(above.height, rowBox.height)
-        val gap = rowBox.top - above.bottom
-        val overlap = min(above.right, rowBox.right) - max(above.left, rowBox.left)
-        val continuousRows = previousRow.drop(1).all { it.previous != null } && rowWords.drop(1).all { it.previous != null }
-        val writtenAfter = row.minOf { it.start.t } > previousRow.flatMap { it.strokes }.minOf { it.start.t }
-        // Wrap only aligned, nearby, unambiguous text runs; columns and late insertions stay separate.
-        if (continuousRows && writtenAfter && gap > 0 && gap <= height * 1.25 &&
-          abs(rowBox.left - above.left) <= height * 0.8 && overlap >= min(above.width, rowBox.width) * 0.6) {
-          rowWords.first().previous = previousRow.last()
+      val runs = mutableListOf<MutableList<WordInk>>()
+      for (word in rowWords) {
+        if (word.previous == null) runs += mutableListOf(word)
+        else runs.last() += word
+      }
+      fun bounds(run: List<WordInk>) = run.map { it.box }.reduce(InkBox::union)
+      val candidates = runs.map { run ->
+        val box = bounds(run)
+        previousRuns.filter { previous ->
+          val above = bounds(previous)
+          val height = max(above.height, box.height)
+          val gap = box.top - above.bottom
+          val overlap = min(above.right, box.right) - max(above.left, box.left)
+          val writtenAfter = run.flatMap { it.strokes }.minOf { it.start.t } >
+            previous.flatMap { it.strokes }.minOf { it.start.t }
+          writtenAfter && gap > 0 && gap <= height * 1.25 &&
+            abs(box.left - above.left) <= height * 0.8 && overlap >= min(above.width, box.width) * 0.6
         }
       }
-      previousRow = rowWords
-      previousBox = rowBox
+      for ((index, run) in runs.withIndex()) {
+        val previous = candidates[index].singleOrNull()
+        // Never branch a linked list when more than one run could continue it.
+        if (previous != null && candidates.count { previous in it } == 1) {
+          run.first().previous = previous.last()
+        }
+      }
+      // An intervening run replaces the frontier in its own column, even if it
+      // could not be linked. Unrelated, vertically staggered columns keep theirs.
+      previousRuns.removeAll { previous ->
+        val above = bounds(previous)
+        runs.any { run ->
+          val box = bounds(run)
+          min(above.right, box.right) >= max(above.left, box.left)
+        }
+      }
+      previousRuns.addAll(runs)
     }
   }
   words.forEach { it.strokes.sortBy { s -> s.start.t } }
@@ -205,6 +257,40 @@ internal fun structureInk(strokes: List<InkTrace>): InkLayout {
   return InkLayout(words, regions, connections, corrections, drawing.toList())
 }
 
+/** Recognize complete horizontal runs, rather than guessing word boundaries before ML Kit.
+ * Geometry groups still define links, but tokens from a run share unresolved ink bounds.
+ */
+internal fun recognitionRuns(layout: InkLayout): InkLayout {
+  val mapped = mutableMapOf<WordInk, WordInk>()
+  val runs = mutableListOf<WordInk>()
+  for (group in layout.words) {
+    val preceding = group.previous
+    val previousRun = mapped[preceding]
+    val sameRow = preceding != null &&
+      min(preceding.box.bottom, group.box.bottom) - max(preceding.box.top, group.box.top) >
+      min(preceding.box.height, group.box.height) * 0.45
+    if (previousRun != null && sameRow && preceding?.regionId == group.regionId) {
+      previousRun.strokes += group.strokes
+      mapped[group] = previousRun
+    } else {
+      val run = WordInk(group.strokes.toMutableList(), group.regionId)
+      run.previous = previousRun
+      runs += run
+      mapped[group] = run
+    }
+  }
+  runs.forEach { it.strokes.sortBy { stroke -> stroke.start.t } }
+  val ids = layout.words.associate { it.id to mapped.getValue(it).id }
+  val corrections = layout.corrections.map { correction ->
+    val targets = (correction["targetGroupIds"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+    correction + mapOf(
+      "targetGroupIds" to targets.mapNotNull { ids[it] }.distinct(),
+      "replacementGroupId" to ids[correction["replacementGroupId"] as? String],
+    )
+  }
+  return layout.copy(words = runs, corrections = corrections)
+}
+
 /** Keep stroke-to-word uncertainty explicit when ML Kit finds multiple words in one geometric group. */
 internal suspend fun recognizeStructuredInk(
   layout: InkLayout,
@@ -216,7 +302,8 @@ internal suspend fun recognizeStructuredInk(
   for (group in layout.words) {
     var previous = tailByGroup[group.previous]?.takeIf { it["text"] != null }
     var context = if (previous == null) "" else contextByGroup[group.previous].orEmpty()
-    val candidates = recognize(group.strokes, context.takeLast(20)).map { it.trim() }.filter { it.isNotEmpty() }
+    val candidates = recognize(group.strokes, (if (context.isEmpty()) "" else "$context ").takeLast(20))
+      .map { it.trim() }.filter { it.isNotEmpty() }
     val tokens = candidates.firstOrNull()?.split(Regex("\\s+")) ?: listOf(null)
     for ((index, token) in tokens.withIndex()) {
       val id = "${group.id}:${index + 1}"

@@ -53,10 +53,22 @@ After the existing line results, Android runs a separate `recognizeStructure` pa
 shows its previous/next neighbours. Tap it for its ID, source strokes, and recognition alternatives.
 The original line results remain available. A failed or outdated second pass cannot replace them.
 
-`InkStructure.kt` groups freehand strokes using local alignment and spacing, attaches nearby small
-marks, and recognizes each group with up to 20 preceding characters through ML Kit. Linking uses
+`InkStructure.kt` groups freehand strokes using local alignment and spacing and attaches nearby small
+marks. Before recognition, `recognitionRuns` combines linked groups on the same row, preserving
+stroke time order. ML Kit sees the complete horizontal text run rather than isolated word fragments.
+Its returned words form the links; they share the run's ink bounds when individual boundaries are
+unresolved. Up to 20 preceding characters (including the word-boundary space) are passed as context.
+Linking uses
 the local row height and continues onto nearby, left-aligned rows written afterward when both rows
-form unbroken runs. Large gaps, columns, different diagram regions, and unread groups break links. IDs reference the input
+form unbroken runs. Horizontal gaps use a local text-height estimate on each side: the median
+height of nearby, vertically overlapping strokes between half and twice that stroke's height.
+Neighbors must be within 1.8 times the smaller stroke height. A gap greater than 1.8 times the
+smaller of the two local estimates starts an independent run. Thus a heading or tall neighboring
+block cannot enlarge the spacing allowance of small text. Nearby dots inherit the body text's
+scale rather than shrinking its word spacing. Each run keeps its own
+continuation frontier, so side-by-side blocks (including staggered rows) can wrap downward without
+sharing links or recognition context. Ambiguous continuations remain separate. Large vertical gaps,
+different diagram regions, and unread groups break links. IDs reference the input
 stroke IDs for that recognition snapshot. If ML Kit returns multiple words from one group, they
 have separate links but explicitly share an unresolved ink boundary; no individual word boxes are
 fabricated. This preview is designed for left-to-right, space-separated writing.
@@ -69,8 +81,16 @@ Use the **freehand pen** for these tests; the existing capture layer only suppli
 strokes, not Excalidraw's rectangle, arrow, table, or typed-text objects.
 
 Dense, late scribbles can produce cross-out and above-word replacement suggestions. They do not
-delete words or rewire links automatically. Use the existing eraser/undo to apply an actual edit.
+remove strokes from recognition, delete words, or rewire links automatically. Long straight strokes
+are retained as possible writing unless a complete table cell or a connector between identified
+shapes corroborates their drawing role. Use the existing eraser/undo to apply an actual edit.
 The preview is recomputed after recognition and is not part of the shared v1 JSON export.
+
+The shared line pass resets recognition context between blocks and after an unread/empty line.
+Its default horizontal gap limit also uses 1.8 times local text height, estimated from nearby
+comparable strokes rather than the full line bounding box. Writing-area hints remain disabled until
+real handwriting comparisons establish a useful setting. Geometry tests verify requests and links;
+they do not measure ML Kit character/word accuracy.
 
 The implementation and results component live in this Android directory. The only shared-screen
 change imports and mounts `StructuredResults` after the existing results; it renders nothing on

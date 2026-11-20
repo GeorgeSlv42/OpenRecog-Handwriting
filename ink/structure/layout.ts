@@ -15,7 +15,7 @@ import type { BBox, Block, Line, Stroke, Structure } from '../model/types.ts'
 export interface LayoutOptions {
   /** Share of the smaller vertical extent a stroke and a line must overlap to be the same line. */
   lineOverlap: number
-  /** Max horizontal gap inside a line, in line heights. */
+  /** Max horizontal gap inside a line, in locally estimated text heights. */
   lineGap: number
   /** Max vertical gap between lines of one block, in median line heights. */
   blockGap: number
@@ -25,7 +25,7 @@ export interface LayoutOptions {
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
   lineOverlap: 0.5,
-  lineGap: 3,
+  lineGap: 1.8,
   blockGap: 1,
   drawingHeight: 3,
 }
@@ -35,12 +35,33 @@ interface LineDraft {
   bbox: BBox
 }
 
-function lineScore(stroke: Stroke, line: LineDraft, opts: LayoutOptions): number {
+/** Estimate text size near each stroke, without borrowing scale from distant columns.
+ * Comparable-height neighbors keep dots and isolated tall strokes out of the estimate.
+ */
+function localTextHeights(strokes: readonly Stroke[]): Map<Stroke, number> {
+  return new Map(strokes.map(stroke => {
+    const s = stroke.bbox
+    const neighbors = strokes.filter(other => {
+      const b = other.bbox
+      return b.h > 0 && b.h >= s.h * 0.5 && b.h <= s.h * 2 &&
+        horizontalGap(s, b) <= 1.8 * Math.min(s.h, b.h) &&
+        overlap1d(s.y, s.y + s.h, b.y, b.y + b.h) >= Math.min(s.h, b.h) * 0.45
+    })
+    return [stroke, Math.max(median(neighbors.map(other => other.bbox.h)), 1)] as const
+  }))
+}
+
+function lineScore(stroke: Stroke, line: LineDraft, opts: LayoutOptions, heights: Map<Stroke, number>): number {
   const s = stroke.bbox
   const l = line.bbox
-  const lineH = Math.max(l.h, 1)
+  const lineH = Math.max(l.h, s.h, 1)
 
-  if (horizontalGap(s, l) > opts.lineGap * lineH) return 0
+  // Compare with nearby ink in this line, not its full (possibly inflated) bounding box.
+  const nearest = [...line.strokes].sort((a, b) => horizontalGap(s, a.bbox) - horizontalGap(s, b.bbox))[0]
+  const nearbyHeight = heights.get(nearest)!
+  const incomingHeight = s.h < nearbyHeight * 0.3 ? nearbyHeight : heights.get(stroke)!
+  const localHeight = Math.min(incomingHeight, nearbyHeight)
+  if (horizontalGap(s, l) > opts.lineGap * localHeight) return 0
 
   const shared = overlap1d(s.y, s.y + s.h, l.y, l.y + l.h)
   const ratio = shared / Math.max(Math.min(s.h, l.h), 1)
@@ -55,11 +76,12 @@ function lineScore(stroke: Stroke, line: LineDraft, opts: LayoutOptions): number
 /** Strokes must be in drawing order; each returned line keeps that order. */
 export function groupIntoLines(strokes: readonly Stroke[], opts: LayoutOptions = DEFAULT_LAYOUT): LineDraft[] {
   const lines: LineDraft[] = []
+  const heights = localTextHeights(strokes)
   for (const stroke of strokes) {
     let best: LineDraft | null = null
     let bestScore = 0
     for (const line of lines) {
-      const score = lineScore(stroke, line, opts)
+      const score = lineScore(stroke, line, opts, heights)
       if (score > bestScore) {
         best = line
         bestScore = score
